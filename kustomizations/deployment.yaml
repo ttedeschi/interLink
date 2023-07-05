@@ -1,0 +1,103 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-vk
+  labels:
+    nodeName: test-vk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      nodeName: test-vk
+  template:
+    metadata:
+      labels:
+        nodeName: test-vk
+    spec:
+      containers:
+      - name: inttw-vk
+        image: ghcr.io/intertwin-eu/virtual-kubelet-inttw:v0.0.5
+        imagePullPolicy: Always
+        args:
+        - --nodename
+        - test-vk
+        - --provider
+        - knoc
+        - --provider-config
+        - $VK_CONFIG_PATH
+        - --startup-timeout
+        - 10s
+        - --klog.v
+        - "2"
+        - --klog.logtostderr
+        - --log-level
+        - debug
+        env:
+        - name: KUBELET_PORT
+          value: "10250"
+        - name: VKUBELET_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: INTERLINKCONFIGPATH
+          value: "/etc/interlink/InterLinkConfig.yaml"
+        - name: VKTOKENFILE
+          value: "/opt/interlink/token"
+        - name: VK_CONFIG_PATH
+          value: "/etc/interlink/knoc-cfg.json"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/interlink/InterLinkConfig.yaml
+          subPath: InterLinkConfig.yaml
+        - name: config-json
+          mountPath: /etc/interlink/knoc-cfg.json
+          subPath: knoc-cfg.json
+        - name: token
+          mountPath: /opt/interlink
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+      - name: refresh-token
+        image: ghcr.io/intertwin-eu/virtual-kubelet-inttw-refresh:v0.0.5 
+        imagePullPolicy: Always
+        env:
+        - name: IAM_SERVER
+          value: "https://dodas-iam.cloud.cnaf.infn.it/"
+        # TODO load env IAM client from secret
+        - name: IAM_CLIENT_ID
+          value: "DUMMY"
+        - name: IAM_CLIENT_SECRET
+          value: "DUMMY"
+        - name: IAM_VK_AUD
+          value: intertw-vk
+        - name: TOKEN_PATH
+          value: /opt/interlink/token
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+        volumeMounts:
+        - name: token
+          mountPath: /opt/interlink
+      serviceAccountName: knoc
+      volumes:
+      - name: config
+        configMap:
+          # Provide the name of the ConfigMap you want to mount.
+          name: vk-config
+      - name: config-json
+        configMap:
+          # Provide the name of the ConfigMap you want to mount.
+          name: test-vk-config
+      - name: token
+        emptyDir: {}
+

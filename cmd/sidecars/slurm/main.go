@@ -1,0 +1,25 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	slurm "github.com/intertwin-eu/interlink/pkg/sidecars/slurm"
+)
+
+func main() {
+
+	commonIL.NewInterLinkConfig()
+
+	mutex := http.NewServeMux()
+	mutex.HandleFunc("/status", slurm.StatusHandler)
+	mutex.HandleFunc("/submit", slurm.SubmitHandler)
+	mutex.HandleFunc("/stop", slurm.StopHandler)
+	mutex.HandleFunc("/genericCall", slurm.GenericCallHandler)
+
+	err := http.ListenAndServe(":"+commonIL.InterLinkConfigInst.Sidecarport, mutex)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
