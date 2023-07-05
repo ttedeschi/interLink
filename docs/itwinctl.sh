@@ -4,6 +4,8 @@
 
 VERSION="${VERSION:-0.0.5}"
 
+SIDECAR="${SIDECAR:-slurm}"
+
 OS=$(uname -s)
 
 case "$OS" in
@@ -96,8 +98,16 @@ start () {
     $HOME/.local/interlink/bin/interlink &> $HOME/.local/interlink/logs/interlink.log &
     echo $! > $HOME/.local/interlink/interlink.pid
 
-    $HOME/.local/interlink/bin/interlink-sidecar-slurm  &> $HOME/.local/interlink/logs/slurm-sd.log &
-    echo $! > $HOME/.local/interlink/slurm-sd.pid
+    case "$SIDECAR" in
+    slurm)
+        $HOME/.local/interlink/bin/interlink-sidecar-slurm  &> $HOME/.local/interlink/logs/sd.log &
+        echo $! > $HOME/.local/interlink/sd.pid
+        ;;
+    docker)
+        $HOME/.local/interlink/bin/interlink-sidecar-docker  &> $HOME/.local/interlink/logs/sd.log &
+        echo $! > $HOME/.local/interlink/sd.pid
+        ;;
+    esac
 }
 
 stop () {

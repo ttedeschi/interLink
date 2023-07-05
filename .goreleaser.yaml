@@ -52,11 +52,14 @@ builds:
       - amd64
       - ppc64le
     main: ./cmd/sidecars/slurm
-#archives:
-#  - replacements:
-#      darwin: MacOS
-#      linux: Linux
-#      amd64: x86_64
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "linux" }}Linux
+      {{- else if eq .Arch "darwin" }}MacOS
+      {{- else }}{{ .Arch }}{{ end }}
 checksum:
   name_template: 'checksums.txt'
 snapshot:
