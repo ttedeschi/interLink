@@ -1,1 +1,11 @@
-{"image":"mcr.microsoft.com/devcontainers/go","build":{}}
+{
+	"image": "mcr.microsoft.com/devcontainers/go",
+	"build": {},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.makefile-tools"
+			]
+		}
+	}
+}
