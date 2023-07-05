@@ -1,0 +1,12 @@
+VKTokenFile: "$HOME/interLink/token"
+InterlinkURL: "http://localhost"
+SidecarURL: "http://localhost"
+InterlinkPort: "30002"
+SidecarService: "slurm" #docker, slurm
+SbatchPath: "/usr/bin/sbatch"
+ScancelPath: "/usr/bin/scancel"
+CommandPrefix: ""
+ExportPodData: true
+Tsocks: false
+TsocksPath: "$WORK/tsocks-1.8beta5+ds1/libtsocks.so"
+TsocksLoginNode: "login01"
