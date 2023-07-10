@@ -4,7 +4,9 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"ms-vscode.makefile-tools"
+				"ms-vscode.makefile-tools",
+				"golang.go",
+				"github.vscode-github-actions"
 			]
 		}
 	}
