@@ -30,11 +30,11 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./
+          context: ./docker
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/virtual-kubelet-inttw:${{ env.RELEASE_VERSION }}
-          file: ./Dockerfile.vk
+          file: ./docker/Dockerfile.vk
           platforms: linux/amd64, linux/arm64
 
   virtual-kubelet-refrest-token:
@@ -62,11 +62,11 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./
+          context: ./docker
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/virtual-kubelet-inttw-refresh:${{ env.RELEASE_VERSION }}
-          file: ./Dockerfile.refresh-token
+          file: ./docker/Dockerfile.refresh-token
           platforms: linux/amd64, linux/arm64
 
   interlink:
@@ -94,11 +94,11 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./
+          context: ./docker
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink:${{ env.RELEASE_VERSION }}
-          file: ./Dockerfile.interlink
+          file: ./docker/Dockerfile.interlink
           platforms: linux/amd64, linux/arm64, linux/ppc64le
 
   sidecar-docker:
@@ -126,11 +126,11 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./
+          context: ./docker
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink-sidecar-docker:${{ env.RELEASE_VERSION }}
-          file: ./Dockerfile.sidecar-docker
+          file: ./docker/Dockerfile.sidecar-docker
           platforms: linux/amd64, linux/arm64, linux/ppc64le
 
   sidecar-slurm:
@@ -158,9 +158,9 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./
+          context: ./docker
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink-sidecar-slurm:${{ env.RELEASE_VERSION }}
-          file: ./Dockerfile.sidecar-slurm
+          file: ./docker/Dockerfile.sidecar-slurm
           platforms: linux/amd64, linux/arm64, linux/ppc64le
