@@ -6,7 +6,8 @@
 			"extensions": [
 				"ms-vscode.makefile-tools",
 				"golang.go",
-				"github.vscode-github-actions"
+				"github.vscode-github-actions",
+				"yzhang.markdown-all-in-one"
 			]
 		}
 	}
