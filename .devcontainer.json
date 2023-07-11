@@ -1,6 +1,6 @@
 {
 	"image": "mcr.microsoft.com/devcontainers/go",
-	"build": {},
+	"postCreateCommand": "git remote add upstream https://github.com/intertwin-eu/interLink ;  git  fetch upstream;",
 	"customizations": {
 		"vscode": {
 			"extensions": [
