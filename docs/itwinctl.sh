@@ -113,7 +113,7 @@ start () {
 stop () {
     kill $(cat $HOME/.local/interlink/oauth2-proxy.pid)
     kill $(cat $HOME/.local/interlink/interlink.pid)
-    kill $(cat $HOME/.local/interlink/slurm-sd.pid)
+    kill $(cat $HOME/.local/interlink/sd.pid)
 }
 
 case "$1" in
