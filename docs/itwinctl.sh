@@ -49,7 +49,7 @@ install () {
     curl -o $HOME/.config/interlink/InterLinkConfig.yaml https://raw.githubusercontent.com/intertwin-eu/interLink/main/kustomizations/InterLinkConfig.yaml
 
     ## Download binaries to $HOME/.local/interlink/bin
-    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/${VERSION}/interLink_${OS}_$(uname -m).tar.gz \
+    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/${VERSION}/interLink_$(uname -s)_$(uname -m).tar.gz \
         && tar -xzvf interlink.tar.gz -C $HOME/.local/interlink/bin/
     rm interlink.tar.gz
 
