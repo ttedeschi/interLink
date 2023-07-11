@@ -1,4 +1,4 @@
-module github.com/cloud-pg/interlink
+module github.com/intertwin-eu/interlink
 
 go 1.18
 

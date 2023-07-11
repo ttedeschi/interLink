@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	docker "github.com/cloud-pg/interlink/pkg/sidecars/docker"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	docker "github.com/intertwin-eu/interlink/pkg/sidecars/docker"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	slurm "github.com/cloud-pg/interlink/pkg/sidecars/slurm"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	slurm "github.com/intertwin-eu/interlink/pkg/sidecars/slurm"
 )
 
 func main() {
