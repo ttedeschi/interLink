@@ -1,4 +1,5 @@
-# InterLink
+![Interlink logo](./imgs/interlink_logo.png)
+
 ## :information_source: Overview
 
 InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a container execution lifecycle.
@@ -37,21 +38,20 @@ Content is based on:
 
 
 ## Quick references:
-- [InterLink](#interlink)
-  - [:information\_source: Overview](#information_source-overview)
-  - [Quick references:](#quick-references)
-  - [:fast\_forward: Quick Start](#fast_forward-quick-start)
-    - [Virtual node setup](#virtual-node-setup)
-      - [:grey\_exclamation:  Requirements](#grey_exclamation--requirements)
-      - [Bring up the virtual node](#bring-up-the-virtual-node)
-    - [Setup a Dummy remote executer](#setup-a-dummy-remote-executer)
-    - [:wrench: Kustomizing your Virtual Kubelet](#wrench-kustomizing-your-virtual-kubelet)
-    - [Going serious with InterLink and Sidecars](#going-serious-with-interlink-and-sidecars)
-    - [:information\_source: InterLink Config file](#information_source-interlink-config-file)
-    - [:information\_source: Environment Variables list](#information_source-environment-variables-list)
-  - [GitHub repository management rules](#github-repository-management-rules)
-    - [Merge management](#merge-management)
-    - [Protection on main branch](#protection-on-main-branch)
+- [:information\_source: Overview](#information_source-overview)
+- [Quick references:](#quick-references)
+- [:fast\_forward: Quick Start](#fast_forward-quick-start)
+  - [Virtual node setup](#virtual-node-setup)
+    - [:grey\_exclamation:  Requirements](#grey_exclamation--requirements)
+    - [Bring up the virtual node](#bring-up-the-virtual-node)
+  - [Setup a Dummy remote executer](#setup-a-dummy-remote-executer)
+  - [:wrench: Kustomizing your Virtual Kubelet](#wrench-kustomizing-your-virtual-kubelet)
+  - [Going serious with InterLink and Sidecars](#going-serious-with-interlink-and-sidecars)
+  - [:information\_source: InterLink Config file](#information_source-interlink-config-file)
+  - [:information\_source: Environment Variables list](#information_source-environment-variables-list)
+- [GitHub repository management rules](#github-repository-management-rules)
+  - [Merge management](#merge-management)
+  - [Protection on main branch](#protection-on-main-branch)
 
 ## :fast_forward: Quick Start
 
