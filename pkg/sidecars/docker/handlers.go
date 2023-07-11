@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
-	commonIL "github.com/cloud-pg/interlink/pkg/common"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {

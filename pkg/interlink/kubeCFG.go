@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	commonIL "github.com/cloud-pg/interlink/pkg/common"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
 func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {

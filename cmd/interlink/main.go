@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	commonIL "github.com/cloud-pg/interlink/pkg/common"
-	"github.com/cloud-pg/interlink/pkg/interlink"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	"github.com/intertwin-eu/interlink/pkg/interlink"
 )
 
 var Url string

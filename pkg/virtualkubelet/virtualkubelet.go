@@ -12,8 +12,8 @@ import (
 
 	"github.com/CARV-ICS-FORTH/knoc"
 	common "github.com/CARV-ICS-FORTH/knoc/common"
-	commonIL "github.com/cloud-pg/interlink/pkg/common"
 	"github.com/containerd/containerd/log"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	"github.com/virtual-kubelet/node-cli/manager"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"

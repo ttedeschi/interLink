@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
-	commonIL "github.com/cloud-pg/interlink/pkg/common"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
