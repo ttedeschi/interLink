@@ -1,14 +1,15 @@
 # InterLink
 
+<div style="text-align: center;">
 <img 
     style="display: block; 
            margin-left: auto;
            margin-right: auto;
-           width: 70%;"
+           width: 50%;"
     src="./imgs/interlink_logo.png" 
     alt="Interlink logo">
 </img>
-
+</div>
 
 ## :information_source: Overview
 
