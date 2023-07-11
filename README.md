@@ -60,15 +60,23 @@ Content is based on:
 #### :grey_exclamation:  Requirements
 
 - A working Kubernetes instance >1.24
+  - if you are in hurry:
+    - `curl -sfL https://get.k3s.io |  INSTALL_K3S_VERSION=v1.25.11+k3s1 INSTALL_K3S_EXEC="--tls-san X.X.X.X" sh -s - --disable traefik --disable metric-server`
+      - you do need `--tls-san X.X.X.X` only in case of a machine with a Floating IP attached 
+      - `k3s kubect get node` to check whenever the cluster is ready
 - Kubectl
 
 #### Bring up the virtual node
-- Fastest way to start using interlink, is by deploying a VK in Kubernetes using the prebuilt image:
-    ```bash
-    kubectl create ns vk
-    kubectl kustomize ./kustomizations
-    kubectl apply -n vk -k ./kustomizations
-    ```
+
+Fastest way to start using interlink, is by deploying a VK in Kubernetes using the prebuilt image:
+
+```bash
+kubectl create ns vk
+kubectl kustomize ./kustomizations
+kubectl apply -n vk -k ./kustomizations
+```
+
+In `./kustomizations` you can then play with the different configuration and deployment files in order to customize your setup, as described [here](#wrench-kustomizing-your-virtual-kubelet) .
 
 ### Setup a Dummy remote executer
 

@@ -2,7 +2,7 @@
 
 #export INTERLINKCONFIGPATH="$PWD/kustomizations/InterLinkConfig.yaml"
 
-VERSION="${VERSION:-0.0.5}"
+VERSION="${VERSION:-0.0.1-pre6}"
 
 SIDECAR="${SIDECAR:-slurm}"
 
@@ -49,7 +49,7 @@ install () {
     curl -o $HOME/.config/interlink/InterLinkConfig.yaml https://raw.githubusercontent.com/intertwin-eu/interLink/main/kustomizations/InterLinkConfig.yaml
 
     ## Download binaries to $HOME/.local/interlink/bin
-    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/v${VERSION}/interLink_${VERSION}_${OS}_$(uname -m).tar.gz \
+    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/${VERSION}/interLink_${VERSION}_${OS}_$(uname -m).tar.gz \
         && tar -xzvf interlink.tar.gz -C $HOME/.local/interlink/bin/
     rm interlink.tar.gz
 
