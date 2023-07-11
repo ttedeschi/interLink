@@ -1,19 +1,15 @@
 # InterLink
-
-<div style="text-align: center;">
-<img 
-    style="display: block; 
-           margin-left: auto;
-           margin-right: auto;
-           width: 50%;"
-    src="./imgs/interlink_logo.png" 
-    alt="Interlink logo">
-</img>
-</div>
-
 ## :information_source: Overview
 
-InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a container execution lifecycle. In fact, the project consists of two main components:
+InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a container execution lifecycle.
+
+__Goals__:
+- TBD
+
+__Non-goals__:
+- TBD
+
+The project consists of two main components:
 
 - __A Kubernetes Virtual Node:__ based on the [VirtualKubelet](https://virtual-kubelet.io/) technology. Translating request for a kubernetes pod execution into a remote call to the interLink API server.
 - __The interLink API server:__ a modular and pluggable REST server where you can create your own container manager plugin (called sidecars), or use the existing ones: remote docker execution on a remote host, singularity container on a remote SLURM batch system.
@@ -48,7 +44,7 @@ Content is based on:
     - [Virtual node setup](#virtual-node-setup)
       - [:grey\_exclamation:  Requirements](#grey_exclamation--requirements)
       - [Bring up the virtual node](#bring-up-the-virtual-node)
-      - [Setup a Dummy remote executer](#setup-a-dummy-remote-executer)
+    - [Setup a Dummy remote executer](#setup-a-dummy-remote-executer)
     - [:wrench: Kustomizing your Virtual Kubelet](#wrench-kustomizing-your-virtual-kubelet)
     - [Going serious with InterLink and Sidecars](#going-serious-with-interlink-and-sidecars)
     - [:information\_source: InterLink Config file](#information_source-interlink-config-file)
@@ -74,7 +70,7 @@ Content is based on:
     kubectl apply -n vk -k ./kustomizations
     ```
 
-#### Setup a Dummy remote executer
+### Setup a Dummy remote executer
 
 - Then, use Docker Compose to create and start up containers:
     ```bash
@@ -112,37 +108,40 @@ You can also use Environment Variables to overwrite the majority of default valu
 __You can find instructions on how to get started with installation script (itwinctl) [here](./docs/README.md).__
 
 
-
-
 ### :information_source: InterLink Config file
 Detailed explanation of the InterLink config file key values.
-- InterlinkURL -> the URL to allow the Virtual Kubelet to contact the InterLink module. 
-- SidecarURL -> the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here
-- InterlinkPort -> the Interlink listening port. InterLink and VK will communicate over this port.
-- SidecarService -> the sidecar service. At the moment, it can be only "slurm" or "docker". According to the specified service, InterLink will automatically set the listening port to 4000 for Docker and 4001 for Slurm. set $SIDECARPORT environment variable to specify a custom one
-- SbatchPath -> path to your Slurm's sbatch binary
-- ScancelPath -> path to your Slurm's scancel binary 
-- VKTokenFile -> path to a file containing your token fot OAuth2 proxy authentication.
-- CommandPrefix -> here you can specify a prefix for the programmatically generated script (for the slurm plugin). Basically, if you want to run anything before the script itself, put it here.
-- Tsocks -> true or false values only. Enables or Disables the use of tsocks library to allow proxy networking. Only implemented for the Slurm sidecar at the moment.
-- TsocksPath -> path to your tsocks library.
-- TsocksLoginNode -> specify an existing node to ssh to. It will be your "window to the external world"
+| Key         | Value     |
+|--------------|-----------|
+| InterlinkURL | the URL to allow the Virtual Kubelet to contact the InterLink module. |
+| SidecarURL | the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here |
+| InterlinkPort | the Interlink listening port. InterLink and VK will communicate over this port. |
+| SidecarService | the sidecar service. At the moment, it can be only "slurm" or "docker". According to the specified service, InterLink will automatically set the listening port to 4000 for Docker and 4001 for Slurm. set $SIDECARPORT environment variable to specify a custom one |
+| SbatchPath | path to your Slurm's sbatch binary |
+| ScancelPath | path to your Slurm's scancel binary | 
+| VKTokenFile | path to a file containing your token fot OAuth2 proxy authentication. |
+| CommandPrefix | here you can specify a prefix for the programmatically generated script (for the slurm plugin). Basically, if you want to run anything before the script itself, put it here. |
+| Tsocks | true or false values only. Enables or Disables the use of tsocks library to allow proxy networking. Only implemented for the Slurm sidecar at the moment. |
+| TsocksPath | path to your tsocks library. |
+| TsocksLoginNode | specify an existing node to ssh to. It will be your "window to the external world" |
 
 ### :information_source: Environment Variables list
 Here's the complete list of every customizable environment variable. When specified, it overwrites the listed key within the InterLink config file.
-- $VK_CONFIG_PATH -> VK config file path
-- $INTERLINKURL -> the URL to allow the Virtual Kubelet to contact the InterLink module. Do not specify a port here. Overwrites InterlinkURL.
-- $INTERLINKPORT -> the InterLink listening port. InterLink and VK will communicate over this port. Overwrites InterlinkPort.
-- $INTERLINKCONFIGPATH -> your InterLink config file path. Default is ./kustomizations/InterLinkConfig.yaml
-- $SIDECARURL -> the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here. Overwrites SidecarURL.
-- $SIDECARPORT -> the Sidecar listening port. Docker default is 4000, Slurm default is 4001.
-- $SIDECARSERVICE -> can be "docker" or "slurm" only (for the moment). If SIDECARPORT is not set, will set Sidecar Port in the code to default settings. Overwrites SidecarService.
-- $SBATCHPATH -> path to your Slurm's sbatch binary. Overwrites SbatchPath.
-- $SCANCELPATH -> path to your Slurm's scancel binary. Overwrites ScancelPath.
-- $VKTOKENFILE -> path to a file containing your token fot OAuth2 proxy authentication. Overwrites VKTokenFile.
-- $CUSTOMKUBECONF -> path to a custom kubeconfig to be used as a service agent
-- $TSOCKS -> true or false, to use tsocks library allowing proxy networking. Working on Slurm sidecar at the moment. Overwrites Tsocks.
-- $TSOCKSPATH -> path to your tsocks library. Overwrites TsocksPath.
+
+| Env         | Value     |
+|--------------|-----------|
+| VK_CONFIG_PATH | VK config file path |
+| INTERLINKURL | the URL to allow the Virtual Kubelet to contact the InterLink module. Do not specify a port here. Overwrites InterlinkURL. |
+| INTERLINKPORT | the InterLink listening port. InterLink and VK will communicate over this port. Overwrites InterlinkPort. |
+| INTERLINKCONFIGPATH | your InterLink config file path. Default is `./kustomizations/InterLinkConfig.yaml` |
+| SIDECARURL | the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here. Overwrites SidecarURL. |
+| SIDECARPORT | the Sidecar listening port. Docker default is 4000, Slurm default is 4001. |
+| SIDECARSERVICE | can be "docker" or "slurm" only (for the moment). If SIDECARPORT is not set, will set Sidecar Port in the code to default settings. Overwrites SidecarService. |
+| SBATCHPATH | path to your Slurm's sbatch binary. Overwrites SbatchPath. |
+| SCANCELPATH | path to your Slurm's scancel binary. Overwrites ScancelPath. |
+| VKTOKENFILE | path to a file containing your token fot OAuth2 proxy authentication. Overwrites VKTokenFile. |
+| CUSTOMKUBECONF | path to a service account kubeconfig |
+| TSOCKS | true or false, to use tsocks library allowing proxy networking. Working on Slurm sidecar at the moment. Overwrites Tsocks. |
+| TSOCKSPATH | path to your tsocks library. Overwrites TsocksPath. |
 
 ## GitHub repository management rules
 

@@ -1,4 +1,9 @@
 ## Quick-start: InterLink
+
+### Provider requirements
+
+TBD
+
 ### Install binaries
 
 ```bash
@@ -25,6 +30,7 @@ curl -sfL https://intertwin-eu.github.io/interLink/itwinctl.sh | sh -s - stop
 
 ## Configuration options
 
+Please see [here](../README.md#information_source-environment-variables-list) for setting ENVIRONMENT options.
 
 ### :closed_lock_with_key: Authentication
 InterLink supports OAuth2 proxy authentication, allowing you to set up an authorized group (or managing single-user access) to access services. In order to use it, set the InterLinkPort field to 8080 and run InterLink executable by executing the docs/itwinctl.sh script. The provided script will run InterLink and Slurm sidecar binaries, but you can easily edit it to run another sidecar.
