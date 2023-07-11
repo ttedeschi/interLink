@@ -44,11 +44,9 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			log.Print("create_container")
 			commstr1 := []string{"singularity", "exec"}
 
-			prepareContainerData(container, pod) //get ConfigMaps and Secrets
-
 			envs := prepare_envs(container)
 			image := ""
-			mounts := prepare_mounts(container)
+			mounts := prepare_mounts(container, pod)
 			if strings.HasPrefix(container.Image, "/") {
 				if image_uri, ok := metadata.Annotations["slurm-job.knoc.io/image-root"]; ok {
 					log.Print(image_uri)
@@ -165,7 +163,8 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(bodyBytes)
 }
 
-func GenericCallHandler(w http.ResponseWriter, r *http.Request) {
+func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
+	path := ".kube/"
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -174,11 +173,21 @@ func GenericCallHandler(w http.ResponseWriter, r *http.Request) {
 	var req commonIL.GenericRequestType
 	json.Unmarshal(bodyBytes, &req)
 
-	switch req.Kind {
-	case "kubeconfig":
-		os.Setenv("KUBECONFIG", req.Body)
-		fmt.Println(os.Getenv("KUBECONFIG"))
+	err = os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		log.Println(err)
 	}
+	config, err := os.Create(path + "config")
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = config.Write([]byte(req.Body))
+	if err != nil {
+		log.Println(err)
+	}
+	defer config.Close()
+	os.Setenv("KUBECONFIG", path+"config")
+	fmt.Println(os.Getenv("KUBECONFIG"))
 
 	w.Write([]byte("200"))
 }

@@ -12,8 +12,8 @@ import (
 
 	"github.com/CARV-ICS-FORTH/knoc"
 	common "github.com/CARV-ICS-FORTH/knoc/common"
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	"github.com/containerd/containerd/log"
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	"github.com/virtual-kubelet/node-cli/manager"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"
@@ -81,7 +81,7 @@ func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP st
 func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, err error) {
 
 	commonIL.NewInterLinkConfig()
-	commonIL.NewServiceAgent()
+	commonIL.NewServiceAccount()
 
 	data, err := ioutil.ReadFile(providerConfig)
 	if err != nil {

@@ -19,7 +19,7 @@ func main() {
 	mutex.HandleFunc("/status", interlink.StatusHandler)
 	mutex.HandleFunc("/create", interlink.CreateHandler)
 	mutex.HandleFunc("/delete", interlink.DeleteHandler)
-	mutex.HandleFunc("/genericCall", interlink.GenericCallHandler)
+	mutex.HandleFunc("/setKubeCFG", interlink.SetKubeCFGHandler)
 
 	fmt.Println(commonIL.InterLinkConfigInst)
 
