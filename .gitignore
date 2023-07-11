@@ -1,2 +1,15 @@
-bin/
-dist/
+bin
+build.sh
+sidecars/slurm/.*
+cmd/sidecars/slurm/.*
+sidecars/docker/.*
+cmd/sidecars/docker/.*
+config
+envs.sh
+token
+secret.yaml
+configmap.yaml
+kubeconfig.yaml
+serviceaccount.yaml
+.knoc
+.tmp
