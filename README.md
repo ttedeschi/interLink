@@ -139,6 +139,7 @@ Here's the complete list of every customizable environment variable. When specif
 | SBATCHPATH | path to your Slurm's sbatch binary. Overwrites SbatchPath. |
 | SCANCELPATH | path to your Slurm's scancel binary. Overwrites ScancelPath. |
 | VKTOKENFILE | path to a file containing your token fot OAuth2 proxy authentication. Overwrites VKTokenFile. |
+| SHARED_FS | set this env to "true" to save configmaps values inside files directly mounted to Singularity containers instead of using ENVS to create them later |
 | CUSTOMKUBECONF | path to a service account kubeconfig |
 | TSOCKS | true or false, to use tsocks library allowing proxy networking. Working on Slurm sidecar at the moment. Overwrites Tsocks. |
 | TSOCKSPATH | path to your tsocks library. Overwrites TsocksPath. |
