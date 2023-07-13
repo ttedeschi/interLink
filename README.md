@@ -60,7 +60,7 @@ Content is based on:
 #### :grey_exclamation:  Requirements
 
 - A working Kubernetes instance >1.24
-  - if you are in hurry:
+  - if you are in a hurry:
     - `curl -sfL https://get.k3s.io |  INSTALL_K3S_VERSION=v1.25.11+k3s1 INSTALL_K3S_EXEC="--tls-san X.X.X.X" sh -s - --disable traefik --disable metric-server`
       - you do need `--tls-san X.X.X.X` only in case of a machine with a Floating IP attached 
       - `k3s kubect get node` to check whenever the cluster is ready
