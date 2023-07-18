@@ -8,10 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 
 	common "github.com/CARV-ICS-FORTH/knoc/common"
-	exec "github.com/alexellis/go-execute/pkg/v1"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 
 	"github.com/containerd/containerd/log"
@@ -137,20 +135,15 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 	for podIndex, podStatus := range ret.PodStatus {
 		if podStatus.PodStatus == 1 {
 			NoReq++
-			cmd := []string{"delete", "pod", ret.PodName[podIndex].Name, "-n", "vk"}
-			shell := exec.ExecTask{
-				Command: "kubectl",
-				Args:    cmd,
-				Shell:   true,
-			}
 
-			execReturn, _ := shell.Execute()
-			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
+			pod, _ := p.GetPod(ctx, commonIL.InterLinkConfigInst.Namespace, ret.PodName[podIndex].Name)
+			err := p.DeletePod(ctx, pod)
+			fmt.Println(err)
 
-			if execReturn.Stderr != "" {
-				log.L.Println("Could not delete pod. " + execReturn.Stderr)
+			if err != nil {
+				log.L.Println("Could not delete pod. " + pod.Name)
 			} else {
-				log.L.Println("Pod " + ret.PodName[podIndex].Name + " successfully deleted")
+				log.L.Println("Pod " + pod.Name + " successfully deleted")
 			}
 		}
 	}

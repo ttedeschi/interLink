@@ -1,6 +1,7 @@
 package slurm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,6 +14,8 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var JID []JidStruct
@@ -188,6 +191,13 @@ func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
 	defer config.Close()
 	os.Setenv("KUBECONFIG", path+"config")
 	fmt.Println(os.Getenv("KUBECONFIG"))
+
+	ctx = context.Background()
+	kubecfg, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+	if err != nil {
+		log.Println("Unable to retrieve config file")
+	}
+	clientset = kubernetes.NewForConfigOrDie(kubecfg)
 
 	w.Write([]byte("200"))
 }
