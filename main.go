@@ -17,7 +17,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"strings"
+
+	"net/http"
 
 	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 	"github.com/sirupsen/logrus"
@@ -39,6 +42,7 @@ var (
 )
 
 func main() {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx = cli.ContextWithCancelOnSignal(ctx)
