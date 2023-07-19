@@ -174,6 +174,7 @@ func NewServiceAccount() {
 	}
 	sa = string(temp)
 	os.Remove(path + "getSAConfig.sh")
+	os.Remove(path + "kubeconfig-sa")
 
 	for {
 		returnedVal := SendKubeConfig(sa)
@@ -210,6 +211,5 @@ func SendKubeConfig(body string) string {
 			return "200"
 		}
 	}
-
 	return "400"
 }
