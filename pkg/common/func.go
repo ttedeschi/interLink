@@ -128,7 +128,7 @@ func NewServiceAccount() {
 
 	var sa string
 	var script string
-	path := ".tmp/"
+	path := "/tmp/"
 
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {

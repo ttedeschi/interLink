@@ -1,6 +1,7 @@
 package slurm
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -15,6 +16,8 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type JidStruct struct {
@@ -23,6 +26,9 @@ type JidStruct struct {
 }
 
 var prefix string
+var ctx context.Context
+var kubecfg *rest.Config
+var clientset *kubernetes.Clientset
 
 func prepare_envs(container v1.Container) []string {
 	env := make([]string, 1)
@@ -263,39 +269,19 @@ func mountConfigMaps(container v1.Container, pod *v1.Pod) ([]string, []string) {
 					mode := os.FileMode(*podVolumeSpec.ConfigMap.DefaultMode)
 					podConfigMapDir := filepath.Join(commonIL.InterLinkConfigInst.DataRootFolder, pod.Namespace+"-"+string(pod.UID)+"/", "configMaps/", vol.Name)
 
-					cmd := []string{"get configmap " + cmvs.Name + " -o template --template='{{.data}}' -n " + pod.Namespace}
-					shell := exec2.ExecTask{
-						Command: "kubectl",
-						Args:    cmd,
-						Shell:   true,
-					}
-
-					execReturn, _ := shell.Execute()
-					fmt.Println(execReturn)
-					execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "map[", "")
-					execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "]", "")
-					returnedConfigMapsArray := make([]string, 0)
-
-					if strings.Compare(execReturn.Stdout, "") != 0 {
-						returnedConfigMapsArray = strings.Split(execReturn.Stdout, " ")
-					}
-
-					if returnedConfigMapsArray != nil {
-						for _, element := range returnedConfigMapsArray {
-							parts := strings.Split(element, ":")
-							key := parts[0]
-							value := parts[1]
-							configMaps[key] = value
+					configMap, err := clientset.CoreV1().ConfigMaps(pod.Namespace).Get(cmvs.Name, metav1.GetOptions{})
+					if configMap.Data != nil {
+						for key := range configMap.Data {
+							configMaps[key] = configMap.Data[key]
 							path := filepath.Join(podConfigMapDir, key)
 							path += (":" + mountSpec.MountPath + "/" + key + ",")
 							configMapNamePaths = append(configMapNamePaths, path)
 
 							if strings.Compare(os.Getenv("SHARED_FS"), "true") != 0 {
 								env := string(container.Name) + "_CFG_" + key
-								os.Setenv(env, value)
+								os.Setenv(env, configMap.Data[key])
 								envs = append(envs, env)
 							}
-
 						}
 					}
 
@@ -311,7 +297,7 @@ func mountConfigMaps(container v1.Container, pod *v1.Pod) ([]string, []string) {
 							Shell:   true,
 						}
 
-						execReturn, _ = shell.Execute()
+						execReturn, _ := shell.Execute()
 						if strings.Compare(execReturn.Stdout, "") != 0 {
 							log.Panicln(err)
 						}
@@ -366,36 +352,18 @@ func mountSecrets(container v1.Container, pod *v1.Pod) ([]string, []string) { //
 					fmt.Println(mode)
 					podSecretDir := filepath.Join(commonIL.InterLinkConfigInst.DataRootFolder, pod.Namespace+"-"+string(pod.UID)+"/", "secrets/", vol.Name)
 
-					cmd := []string{"get secret " + svs.SecretName + " -o jsonpath='{.data}' -n " + pod.Namespace}
-					shell := exec2.ExecTask{
-						Command: "kubectl",
-						Args:    cmd,
-						Shell:   true,
-					}
-
-					execReturn, _ := shell.Execute()
-					execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\"", "")
-					execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "{", "")
-					execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "}", "")
-					returnedSecretsArray := make([]string, 0)
-
-					if strings.Compare(execReturn.Stdout, "") != 0 {
-						returnedSecretsArray = strings.Split(execReturn.Stdout, " ")
-					}
-
-					if returnedSecretsArray != nil {
-						for _, element := range returnedSecretsArray {
-							parts := strings.Split(element, ":")
-							key := parts[0]
-							value, _ := base64.StdEncoding.DecodeString(parts[1])
-							secrets[key] = value
+					secret, err := clientset.CoreV1().Secrets(pod.Namespace).Get(svs.SecretName, metav1.GetOptions{})
+					if secret.Data != nil {
+						for key := range secret.Data {
+							secrets[key] = secret.Data[key]
+							decodedSecret, _ := base64.StdEncoding.DecodeString(string(secret.Data[key]))
 							path := filepath.Join(podSecretDir, key)
 							path += (":" + mountSpec.MountPath + "/" + key + ",")
 							secretNamePaths = append(secretNamePaths, path)
 
 							if strings.Compare(os.Getenv("SHARED_FS"), "true") != 0 {
 								env := string(container.Name) + "_SECRET_" + key
-								os.Setenv(env, string(value))
+								os.Setenv(env, string(decodedSecret))
 								envs = append(envs, env)
 							}
 						}
