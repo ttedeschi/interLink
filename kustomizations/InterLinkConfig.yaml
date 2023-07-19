@@ -1,7 +1,7 @@
 VKTokenFile: "$HOME/interLink/token"
-InterlinkURL: "https://intertwin.vega.izum.si"
-SidecarURL: "http://intertwin.vega.izum.si"
-InterlinkPort: "30443"
+InterlinkURL: "http://localhost"
+SidecarURL: "http://localhost"
+InterlinkPort: "3000"
 SidecarService: "slurm" #docker, slurm
 SbatchPath: "/usr/bin/sbatch"
 ScancelPath: "/usr/bin/scancel"
