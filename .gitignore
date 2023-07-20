@@ -13,3 +13,4 @@ kubeconfig.yaml
 serviceaccount.yaml
 .knoc
 .tmp
+kustomizations_tmp
