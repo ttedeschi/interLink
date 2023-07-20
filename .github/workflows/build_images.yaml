@@ -30,7 +30,7 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: ./
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/virtual-kubelet-inttw:${{ env.RELEASE_VERSION }}
@@ -62,7 +62,7 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: ./
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/virtual-kubelet-inttw-refresh:${{ env.RELEASE_VERSION }}
@@ -94,7 +94,7 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: ./
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink:${{ env.RELEASE_VERSION }}
@@ -126,7 +126,7 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: ./
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink-sidecar-docker:${{ env.RELEASE_VERSION }}
@@ -158,7 +158,7 @@ jobs:
       - name: Build container base image
         uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: ./
           outputs: "type=registry,push=true"
           tags: |
             ghcr.io/${{ steps.get_repo_owner.outputs.repo_owner }}/interlink-sidecar-slurm:${{ env.RELEASE_VERSION }}

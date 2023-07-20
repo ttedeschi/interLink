@@ -18,6 +18,7 @@ if __name__ == '__main__':
             "IAM_SERVER", "https://cms-auth.web.cern.ch/")
         iam_client_id = os.environ.get("IAM_CLIENT_ID")
         iam_client_secret = os.environ.get("IAM_CLIENT_SECRET")
+        iam_refresh_token = os.environ.get("IAM_REFRESH_TOKEN")
         audience = os.environ.get("IAM_VK_AUD")
         output_file = os.environ.get("TOKEN_PATH", "/opt/interlink/token")
     except Exception as ex:
@@ -31,11 +32,11 @@ if __name__ == '__main__':
             request_data = {
                 "client_id": iam_client_id,
                 "client_secret": iam_client_secret,
-                "grant_type": "client_credentials",
-                "username": "not_needed",
-                "password": "not_needed",
-                "scope": "openid profile email iam groups",
-                "aud": audience
+                "grant_type": "refresh_token",
+                "username": iam_client_id,
+                "password": iam_client_secret,
+                "refresh_token": iam_refresh_token,
+                "scope": "openid profile email address phone offline_access"
             }
             r = requests.post(iam_server+"token", data=request_data)
             response = json.loads(r.text)

@@ -2,7 +2,7 @@
 
 #export INTERLINKCONFIGPATH="$PWD/kustomizations/InterLinkConfig.yaml"
 
-VERSION="${VERSION:-0.0.5}"
+VERSION="${VERSION:-0.0.1-pre6}"
 
 SIDECAR="${SIDECAR:-slurm}"
 
@@ -32,6 +32,8 @@ AUTHORIZED_GROUPS="${AUTHORIZED_GROUPS:-intw}"
 AUTHORIZED_AUD="${AUTHORIZED_AUD:-intertw-vk}"
 API_HTTP_PORT="${API_HTTP_PORT:-8080}"
 API_HTTPS_PORT="${API_HTTPS_PORT:-443}"
+export HOSTCERT="${HOSTCERT:-/etc/hostcert.pem}"
+export HOSTKEY="${HOSTKEY:-/etc/hostkey.pem}"
 export INTERLINKPORT="${INTERLINKPORT:-3000}"
 export INTERLINKURL="${INTERLINKURL:-http://0.0.0.0}"
 export INTERLINKPORT="${INTERLINKPORT:-3000}"
@@ -49,7 +51,7 @@ install () {
     curl -o $HOME/.config/interlink/InterLinkConfig.yaml https://raw.githubusercontent.com/intertwin-eu/interLink/main/kustomizations/InterLinkConfig.yaml
 
     ## Download binaries to $HOME/.local/interlink/bin
-    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/v${VERSION}/interLink_${VERSION}_${OS}_$(uname -m).tar.gz \
+    curl -L -o interlink.tar.gz https://github.com/intertwin-eu/interLink/releases/download/${VERSION}/interLink_$(uname -s)_$(uname -m).tar.gz \
         && tar -xzvf interlink.tar.gz -C $HOME/.local/interlink/bin/
     rm interlink.tar.gz
 
@@ -73,7 +75,7 @@ start () {
     $HOME/.local/interlink/bin/oauth2-proxy-v7.4.0.linux-$OSARCH/oauth2-proxy \
         --client-id DUMMY \
         --client-secret DUMMY \
-        --http-address http://0.0.0.0:$API_HTTP_PORT \
+        --http-address 0.0.0.0:$API_HTTP_PORT \
         --oidc-issuer-url $OIDC_ISSUER \
         --pass-authorization-header true \
         --provider oidc \
@@ -86,10 +88,11 @@ start () {
         --email-domain=* \
         --cookie-secret 2ISpxtx19fm7kJlhbgC4qnkuTlkGrshY82L3nfCSKy4= \
         --skip-auth-route="*='*'" \
-        --skip-jwt-bearer-tokens true &> $HOME/.local/interlink/logs/oauth2-proxy.log &
-        # --https-address http://0.0.0.0:$API_HTTPS_PORT \
-        # --tls-cert-file $HOME/.local/interlink/cert.pem \
-        # --tls-key-file $HOME/.local/interlink/key.pem \
+	    --force-https \
+        --https-address 0.0.0.0:$API_HTTPS_PORT \
+        --tls-cert-file ${HOSTCERT} \
+        --tls-key-file ${HOSTKEY} \
+        --skip-jwt-bearer-tokens true > $HOME/.local/interlink/logs/oauth2-proxy.log 2>&1 &
 
     echo $! > $HOME/.local/interlink/oauth2-proxy.pid
 
@@ -113,7 +116,7 @@ start () {
 stop () {
     kill $(cat $HOME/.local/interlink/oauth2-proxy.pid)
     kill $(cat $HOME/.local/interlink/interlink.pid)
-    kill $(cat $HOME/.local/interlink/slurm-sd.pid)
+    kill $(cat $HOME/.local/interlink/sd.pid)
 }
 
 case "$1" in
