@@ -60,15 +60,24 @@ Content is based on:
 #### :grey_exclamation:  Requirements
 
 - A working Kubernetes instance >1.24
+  - if you are in a hurry:
+    - `curl -sfL https://get.k3s.io |  INSTALL_K3S_VERSION=v1.25.11+k3s1 INSTALL_K3S_EXEC="--tls-san X.X.X.X" sh -s - --disable traefik --disable metric-server`
+      - you do need `--tls-san X.X.X.X` only in case of a machine with a Floating IP attached 
+      - `k3s kubect get node` to check whenever the cluster is ready
 - Kubectl
+- Docker 
 
 #### Bring up the virtual node
-- Fastest way to start using interlink, is by deploying a VK in Kubernetes using the prebuilt image:
-    ```bash
-    kubectl create ns vk
-    kubectl kustomize ./kustomizations
-    kubectl apply -n vk -k ./kustomizations
-    ```
+
+Fastest way to start using interlink, is by deploying a VK in Kubernetes using the prebuilt image:
+
+```bash
+kubectl create ns vk
+kubectl kustomize ./kustomizations -n vk
+kubectl apply -n vk -k ./kustomizations
+```
+
+In `./kustomizations` you can then play with the different configuration and deployment files in order to customize your setup, as described [here](#wrench-kustomizing-your-virtual-kubelet) .
 
 ### Setup a Dummy remote executer
 
@@ -82,7 +91,7 @@ Content is based on:
     - A Docker Sidecar
 - Submit a YAML to your K8S cluster to test it. You could try:
     ```bash
-    kubectl apply -f examples/interlink_mock/payloads/busyecho_k8s.yaml -n vk
+    kubectl apply -f examples/busyecho_k8s.yaml  -n vk
     ```
 You will see know a container starting up on your host, but managed by the docker compose interlink daemons.
 

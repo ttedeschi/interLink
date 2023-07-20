@@ -160,7 +160,7 @@ func NewServiceAccount() {
 
 	cmd := []string{path + "getSAConfig.sh"}
 	shell := exec.ExecTask{
-		Command: "source",
+		Command: "sh",
 		Args:    cmd,
 		Shell:   true,
 	}
