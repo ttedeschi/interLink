@@ -65,6 +65,7 @@ Content is based on:
       - you do need `--tls-san X.X.X.X` only in case of a machine with a Floating IP attached 
       - `k3s kubect get node` to check whenever the cluster is ready
 - Kubectl
+- Docker 
 
 #### Bring up the virtual node
 
@@ -72,7 +73,7 @@ Fastest way to start using interlink, is by deploying a VK in Kubernetes using t
 
 ```bash
 kubectl create ns vk
-kubectl kustomize ./kustomizations
+kubectl kustomize ./kustomizations -n vk
 kubectl apply -n vk -k ./kustomizations
 ```
 
@@ -90,7 +91,7 @@ In `./kustomizations` you can then play with the different configuration and dep
     - A Docker Sidecar
 - Submit a YAML to your K8S cluster to test it. You could try:
     ```bash
-    kubectl apply -f examples/interlink_mock/payloads/busyecho_k8s.yaml -n vk
+    kubectl apply -f examples/busyecho_k8s.yaml  -n vk
     ```
 You will see know a container starting up on your host, but managed by the docker compose interlink daemons.
 
