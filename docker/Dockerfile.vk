@@ -18,6 +18,6 @@ COPY --from=build-stage /app/bin/vk /vk
 
 COPY --from=kubectl /opt/bitnami/kubectl/bin/kubectl /usr/local/bin/
 
-USER nonroot:nonroot
+USER nobody:nobody
 
 ENTRYPOINT ["/vk"]
