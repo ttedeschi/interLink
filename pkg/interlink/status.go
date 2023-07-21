@@ -11,6 +11,7 @@ import (
 )
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("InterLink: received GetStatus call")
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -22,13 +23,14 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
+	log.Println("InterLink: forwarding GetStatus call to sidecar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	returnValue, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Returned from 2nd layer: " + string(returnValue))
+	fmt.Println("InterLink: status " + string(returnValue))
 
 	w.Write(returnValue)
 }

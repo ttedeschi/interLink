@@ -90,7 +90,7 @@ In `./kustomizations` you can then play with the different configuration and dep
     - A Docker Sidecar
 - Submit a YAML to your K8S cluster to test it. You could try:
     ```bash
-    kubectl apply -f examples/busyecho_k8s.yaml  -n vk
+    kubectl apply -f examples/busyecho_k8s.yaml -n vk
     ```
 You will see know a container starting up on your host, but managed by the docker compose interlink daemons.
 
