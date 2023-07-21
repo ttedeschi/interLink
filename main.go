@@ -29,13 +29,6 @@ import (
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/node"
-	v1 "k8s.io/api/core/v1"
-)
-
-var (
-	buildVersion = "N/A"
-	buildTime    = "N/A"
-	k8sVersion   = "v1.15.2" // This should follow the version of k8s.io/kubernetes we are importing
 )
 
 type Config struct {
@@ -58,9 +51,9 @@ func main() {
 	cfg := Config{
 		ConfigPath:      "",
 		NodeName:        "",
-		OperatingSystem: "",
-		InternalIP:      "",
-		DaemonPort:      0,
+		OperatingSystem: "Linux",
+		InternalIP:      "127.0.0.1",
+		DaemonPort:      10250,
 	}
 
 	kubecfg, _ := rest.InClusterConfig()
@@ -70,8 +63,17 @@ func main() {
 	nodeProvider, _ := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort)
 
 	nc, _ := node.NewNodeController(
-		nodeProvider, &v1.Node{}, localClient.CoreV1().Nodes(),
+		nodeProvider, nodeProvider.GetNode(), localClient.CoreV1().Nodes(),
 	)
+
+	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/root.go#L195C49-L195C49
+	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/http.go#L76-L84
+	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/http.go#L93
+
+	// err = setupHTTPServer(ctx, podProvider.PodHandler(), localClient, remoteConfig, c)
+	// if err != nil {
+	// log.G(ctx).Fatal(err)
+	// }
 
 	if err := nc.Run(ctx); err != nil {
 		log.G(ctx).Fatal(err)
