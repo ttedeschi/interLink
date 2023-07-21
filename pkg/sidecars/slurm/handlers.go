@@ -1,9 +1,7 @@
 package slurm
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,25 +12,23 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var JID []JidStruct
 
 func SubmitHandler(w http.ResponseWriter, r *http.Request) {
-	//call to slurm create container
+	log.Println("Slurm Sidecar: received Submit call")
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
 	var req commonIL.Request
 	json.Unmarshal(bodyBytes, &req)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
@@ -44,7 +40,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		metadata = pod.ObjectMeta
 
 		for _, container := range containers {
-			log.Print("create_container")
+			log.Println("Beginning script generation for container " + container.Name)
 			commstr1 := []string{"singularity", "exec"}
 
 			envs := prepare_envs(container)
@@ -52,30 +48,29 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			mounts := prepare_mounts(container, pod)
 			if strings.HasPrefix(container.Image, "/") {
 				if image_uri, ok := metadata.Annotations["slurm-job.knoc.io/image-root"]; ok {
-					log.Print(image_uri)
+					log.Println(image_uri)
 					image = image_uri + container.Image
 				} else {
-					log.Print("image-uri annotation not specified for path in remote filesystem")
+					log.Println("image-uri annotation not specified for path in remote filesystem")
 				}
 			} else {
 				image = "docker://" + container.Image
 			}
 			image = container.Image
 
+			log.Println("Appending all commands together...")
 			singularity_command := append(commstr1, envs...)
 			singularity_command = append(singularity_command, mounts...)
 			singularity_command = append(singularity_command, image)
 			singularity_command = append(singularity_command, container.Command...)
 			singularity_command = append(singularity_command, container.Args...)
 
-			log.Println("Generating Slurm script")
 			path := produce_slurm_script(container, metadata, singularity_command)
-			log.Println("Submitting Slurm job")
 			out := slurm_batch_submit(path)
 			handle_jid(container, out, *pod)
-			log.Print(out)
+			log.Println(out)
 
-			jid, err := os.ReadFile(".knoc/" + container.Name + ".jid")
+			jid, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + container.Name + ".jid")
 			if err != nil {
 				log.Println("Unable to read JID from file")
 			}
@@ -87,16 +82,18 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func StopHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Slurm Sidecar: received Stop call")
+
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
 	var req commonIL.Request
 	err = json.Unmarshal(bodyBytes, &req)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
@@ -110,9 +107,11 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Slurm Sidecar: received GetStatus call")
+
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
@@ -120,7 +119,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	var resp commonIL.StatusResponse
 	json.Unmarshal(bodyBytes, &req)
 	if err != nil {
-		log.Print(err)
+		log.Println(err)
 		return
 	}
 
@@ -133,7 +132,9 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	execReturn, err := shell.Execute()
 	execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
-	log.Println(execReturn.Stdout)
+	if execReturn.Stderr != "" {
+		log.Println("Unable to retrieve job status: " + execReturn.Stderr)
+	}
 
 	for _, pod := range req.Pods {
 		var flag = false
@@ -148,8 +149,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			execReturn, _ := shell.Execute()
 
-			if execReturn.Stdout != "" {
+			if execReturn.Stderr != "" {
+				log.Println("Unable to retrieve job status: " + execReturn.Stderr)
+			} else if execReturn.Stdout != "" {
 				flag = true
+				log.Println(execReturn.Stdout)
 			}
 		}
 
@@ -167,7 +171,9 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
-	path := ".kube/"
+	log.Println("Slurm Sidecar: received SetKubeCFG call")
+	path := "/tmp/.kube/"
+	retCode := "200"
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -176,28 +182,47 @@ func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
 	var req commonIL.GenericRequestType
 	json.Unmarshal(bodyBytes, &req)
 
+	log.Println("Creating folder to save KubeConfig")
 	err = os.MkdirAll(path, os.ModePerm)
 	if err != nil {
 		log.Println(err)
+		retCode = "500"
+		w.Write([]byte(retCode))
+		return
+	} else {
+		log.Println("Successfully created folder")
 	}
+	log.Println("Creating the actual KubeConfig file")
 	config, err := os.Create(path + "config")
 	if err != nil {
 		log.Println(err)
+		retCode = "500"
+		w.Write([]byte(retCode))
+		return
+	} else {
+		log.Println("Successfully created file")
 	}
+	log.Println("Writing configuration to file")
 	_, err = config.Write([]byte(req.Body))
 	if err != nil {
 		log.Println(err)
+		retCode = "500"
+		w.Write([]byte(retCode))
+		return
+	} else {
+		log.Println("Successfully written configuration")
 	}
 	defer config.Close()
-	os.Setenv("KUBECONFIG", path+"config")
-	fmt.Println(os.Getenv("KUBECONFIG"))
-
-	ctx = context.Background()
-	kubecfg, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+	log.Println("Setting KUBECONFIG env")
+	err = os.Setenv("KUBECONFIG", path+"config")
 	if err != nil {
-		log.Println("Unable to retrieve config file")
+		log.Println(err)
+		retCode = "500"
+		w.Write([]byte(retCode))
+		return
+	} else {
+		log.Println("Successfully set KUBECONFIG to " + path + "config")
 	}
-	clientset = kubernetes.NewForConfigOrDie(kubecfg)
 
-	w.Write([]byte("200"))
+	w.Write([]byte(retCode))
 }

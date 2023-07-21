@@ -11,6 +11,7 @@ import (
 )
 
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("InterLink: received Delete call")
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -30,13 +31,14 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
+	log.Println("InterLink: forwarding Delete call to sidecar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	returnValue, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Deleted container " + string(returnValue))
+	fmt.Println("InterLink: deleted container " + string(returnValue))
 
 	w.Write(returnValue)
 }

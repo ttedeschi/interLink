@@ -12,6 +12,7 @@ import (
 )
 
 func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("InterLink: received SetKubeCFG call")
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -28,6 +29,7 @@ func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 
+		log.Println("InterLink: forwarding SetKubeCFG call to sidecar")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Println(err)
@@ -38,8 +40,10 @@ func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(string(returnValue))
 
 		if string(returnValue) == "200" {
+			log.Println("InterLink: received a valid response")
 			break
 		}
+		log.Println("InterLink: received a not valid response: " + string(returnValue))
 	}
 
 	w.Write(returnValue)
