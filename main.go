@@ -18,6 +18,11 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"io/ioutil"
+	"os"
+
+	//"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"net/http"
 
@@ -40,7 +45,27 @@ type Config struct {
 	KubeClusterDomain string
 }
 
+// Opts stores all the options for configuring the root virtual-kubelet command.
+// It is used for setting flag values.
+type Opts struct {
+	ConfigPath string
+
+	// Node name to use when creating a node in Kubernetes
+	NodeName string
+}
+
+// NewOpts returns an Opts struct with the default values set.
+func NewOpts() *Opts {
+	return &Opts{
+		ConfigPath: os.Getenv("CONFIGPATH"),
+		NodeName:   os.Getenv("NODENAME"),
+	}
+}
+
 func main() {
+	// Try from bash:
+	// INTERLINKCONFIGPATH=$PWD/kustomizations/InterLinkConfig.yaml CONFIGPATH=PWD/kustomizations/knoc-cfg.json NODENAME=test-vk ./bin/vk
+
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -48,19 +73,45 @@ func main() {
 	logger := logrus.StandardLogger()
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
 
+	opts := NewOpts()
+
 	cfg := Config{
-		ConfigPath:      "",
-		NodeName:        "",
+		ConfigPath:      opts.ConfigPath,
+		NodeName:        opts.NodeName,
 		OperatingSystem: "Linux",
 		InternalIP:      "127.0.0.1",
 		DaemonPort:      10250,
 	}
 
-	kubecfg, _ := rest.InClusterConfig()
+	kubecfgFile, err := ioutil.ReadFile(os.Getenv("KUBECONFIG"))
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
+
+	clientCfg, err := clientcmd.NewClientConfigFromBytes(kubecfgFile)
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
+
+	var kubecfg *rest.Config
+
+	kubecfg, err = clientCfg.ClientConfig()
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
+
+	// TODO: enable on demand
+	// kubecfg, err := rest.InClusterConfig()
+	// if err != nil {
+	//	log.G(ctx).Fatal(err)
+	// }
 
 	localClient := kubernetes.NewForConfigOrDie(kubecfg)
 
-	nodeProvider, _ := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort)
+	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort)
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
 
 	nc, _ := node.NewNodeController(
 		nodeProvider, nodeProvider.GetNode(), localClient.CoreV1().Nodes(),
