@@ -18,21 +18,18 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"strings"
 
 	"net/http"
 
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 	"github.com/sirupsen/logrus"
-	cli "github.com/virtual-kubelet/node-cli"
-	logruscli "github.com/virtual-kubelet/node-cli/logrus"
-	opencensuscli "github.com/virtual-kubelet/node-cli/opencensus"
-	"github.com/virtual-kubelet/node-cli/opts"
-	"github.com/virtual-kubelet/node-cli/provider"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
-	"github.com/virtual-kubelet/virtual-kubelet/trace"
-	"github.com/virtual-kubelet/virtual-kubelet/trace/opencensus"
+	"github.com/virtual-kubelet/virtual-kubelet/node"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -41,45 +38,42 @@ var (
 	k8sVersion   = "v1.15.2" // This should follow the version of k8s.io/kubernetes we are importing
 )
 
+type Config struct {
+	ConfigPath        string
+	NodeName          string
+	OperatingSystem   string
+	InternalIP        string
+	DaemonPort        int32
+	KubeClusterDomain string
+}
+
 func main() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = cli.ContextWithCancelOnSignal(ctx)
 
 	logger := logrus.StandardLogger()
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
-	logConfig := &logruscli.Config{LogLevel: "info"}
 
-	trace.T = opencensus.Adapter{}
-	traceConfig := opencensuscli.Config{
-		AvailableExporters: map[string]opencensuscli.ExporterInitFunc{
-			"ocagent": initOCAgent,
-		},
+	cfg := Config{
+		ConfigPath:      "",
+		NodeName:        "",
+		OperatingSystem: "",
+		InternalIP:      "",
+		DaemonPort:      0,
 	}
 
-	o := opts.New()
-	o.Provider = "knoc"
-	o.Version = strings.Join([]string{k8sVersion, "vk-knoc", buildVersion}, "-")
-	node, err := cli.New(ctx,
-		cli.WithBaseOpts(o),
-		cli.WithCLIVersion(buildVersion, buildTime),
-		cli.WithProvider("knoc", func(cfg provider.InitConfig) (provider.Provider, error) {
-			return virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.ResourceManager, cfg.DaemonPort)
-		}),
-		cli.WithPersistentFlags(logConfig.FlagSet()),
-		cli.WithPersistentPreRunCallback(func() error {
-			return logruscli.Configure(logConfig, logger)
-		}),
-		cli.WithPersistentFlags(traceConfig.FlagSet()),
-		cli.WithPersistentPreRunCallback(func() error {
-			return opencensuscli.Configure(ctx, &traceConfig, o)
-		}),
+	kubecfg, _ := rest.InClusterConfig()
+
+	localClient := kubernetes.NewForConfigOrDie(kubecfg)
+
+	nodeProvider, _ := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort)
+
+	nc, _ := node.NewNodeController(
+		nodeProvider, &v1.Node{}, localClient.CoreV1().Nodes(),
 	)
-	if err != nil {
-		log.G(ctx).Fatal(err)
-	}
-	if err := node.Run(); err != nil {
+
+	if err := nc.Run(ctx); err != nil {
 		log.G(ctx).Fatal(err)
 	}
 }

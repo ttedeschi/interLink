@@ -73,7 +73,6 @@ Fastest way to start using interlink, is by deploying a VK in Kubernetes using t
 
 ```bash
 kubectl create ns vk
-kubectl kustomize ./kustomizations -n vk
 kubectl apply -n vk -k ./kustomizations
 ```
 

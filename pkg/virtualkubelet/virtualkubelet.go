@@ -10,11 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/CARV-ICS-FORTH/knoc"
-	common "github.com/CARV-ICS-FORTH/knoc/common"
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	"github.com/virtual-kubelet/node-cli/manager"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"
 	"github.com/virtual-kubelet/virtual-kubelet/trace"
@@ -24,8 +21,33 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
+const (
+	DefaultCPUCapacity    = "100"
+	DefaultMemoryCapacity = "3000G"
+	DefaultPodCapacity    = "10000"
+	NamespaceKey          = "namespace"
+	NameKey               = "name"
+	CREATE                = 0
+	DELETE                = 1
+)
+
+func BuildKeyFromNames(namespace string, name string) (string, error) {
+	return fmt.Sprintf("%s-%s", namespace, name), nil
+}
+
+func BuildKey(pod *v1.Pod) (string, error) {
+	if pod.ObjectMeta.Namespace == "" {
+		return "", fmt.Errorf("pod namespace not found")
+	}
+
+	if pod.ObjectMeta.Name == "" {
+		return "", fmt.Errorf("pod name not found")
+	}
+
+	return BuildKeyFromNames(pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+}
+
 type VirtualKubeletProvider struct {
-	knoc.KNOCProvider
 	nodeName           string
 	operatingSystem    string
 	internalIP         string
@@ -33,33 +55,33 @@ type VirtualKubeletProvider struct {
 	pods               map[string]*v1.Pod
 	config             VirtualKubeletConfig
 	startTime          time.Time
-	resourceManager    *manager.ResourceManager
 	notifier           func(*v1.Pod)
 }
 
 type VirtualKubeletConfig struct {
-	knoc.KNOCConfig
+	CPU    string `json:"cpu,omitempty"`
+	Memory string `json:"memory,omitempty"`
+	Pods   string `json:"pods,omitempty"`
 }
 
 // NewProviderConfig creates a new KNOCV0Provider. KNOC legacy provider does not implement the new asynchronous podnotifier interface
-func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem string, internalIP string, rm *manager.ResourceManager, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
+func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem string, internalIP string, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
 
 	// set defaults
 	if config.CPU == "" {
-		config.CPU = common.DefaultCPUCapacity
+		config.CPU = DefaultCPUCapacity
 	}
 	if config.Memory == "" {
-		config.Memory = common.DefaultMemoryCapacity
+		config.Memory = DefaultMemoryCapacity
 	}
 	if config.Pods == "" {
-		config.Pods = common.DefaultPodCapacity
+		config.Pods = DefaultPodCapacity
 	}
 	provider := VirtualKubeletProvider{
 		nodeName:           nodeName,
 		operatingSystem:    operatingSystem,
 		internalIP:         internalIP,
 		daemonEndpointPort: daemonEndpointPort,
-		resourceManager:    rm,
 		pods:               make(map[string]*v1.Pod),
 		config:             config,
 		startTime:          time.Now(),
@@ -69,12 +91,12 @@ func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem st
 }
 
 // NewProvider creates a new Provider, which implements the PodNotifier interface
-func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP string, rm *manager.ResourceManager, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
+func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP string, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
 	config, err := loadConfig(providerConfig, nodeName)
 	if err != nil {
 		return nil, err
 	}
-	return NewProviderConfig(config, nodeName, operatingSystem, internalIP, rm, daemonEndpointPort)
+	return NewProviderConfig(config, nodeName, operatingSystem, internalIP, daemonEndpointPort)
 }
 
 // loadConfig loads the given json configuration files and yaml to communicate with InterLink.
@@ -95,13 +117,13 @@ func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, e
 	if _, exist := configMap[nodeName]; exist {
 		config = configMap[nodeName]
 		if config.CPU == "" {
-			config.CPU = common.DefaultCPUCapacity
+			config.CPU = DefaultCPUCapacity
 		}
 		if config.Memory == "" {
-			config.Memory = common.DefaultMemoryCapacity
+			config.Memory = DefaultMemoryCapacity
 		}
 		if config.Pods == "" {
-			config.Pods = common.DefaultPodCapacity
+			config.Pods = DefaultPodCapacity
 		}
 	}
 
@@ -117,6 +139,14 @@ func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, e
 	return config, nil
 }
 
+func (p *VirtualKubeletProvider) NotifyNodeStatus(ctx context.Context, f func(*v1.Node)) {
+	return
+}
+
+func (p *VirtualKubeletProvider) Ping(ctx context.Context) error {
+	return nil
+}
+
 // CreatePod accepts a Pod definition and stores it in memory.
 func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	ctx, span := trace.StartSpan(ctx, "CreatePod")
@@ -125,8 +155,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	defer span.End()
 	distribution := "docker://"
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
-	key, err := common.BuildKey(pod)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -150,7 +180,7 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 		// run init container with remote execution enabled
 		for _, container := range pod.Spec.InitContainers {
 			// MUST TODO: Run init containers sequentialy and NOT all-together
-			RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
+			RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 		}
 
 		pod.Status = v1.PodStatus{
@@ -200,7 +230,7 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 		var err error
 
 		if !hasInitContainers {
-			err = RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
+			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 
 		}
 		if err != nil {
@@ -242,11 +272,11 @@ func (p *VirtualKubeletProvider) UpdatePod(ctx context.Context, pod *v1.Pod) err
 	defer span.End()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
 
 	log.G(ctx).Infof("receive UpdatePod %q", pod.Name)
 
-	key, err := common.BuildKey(pod)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -263,11 +293,11 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	defer span.End()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
 
 	log.G(ctx).Infof("receive DeletePod %q", pod.Name)
 
-	key, err := common.BuildKey(pod)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -281,10 +311,10 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	pod.Status.Reason = "KNOCProviderPodDeleted"
 
 	for _, container := range pod.Spec.Containers {
-		RemoteExecution(p, ctx, common.DELETE, "", pod, container)
+		RemoteExecution(p, ctx, DELETE, "", pod, container)
 	}
 	for _, container := range pod.Spec.InitContainers {
-		RemoteExecution(p, ctx, common.DELETE, "", pod, container)
+		RemoteExecution(p, ctx, DELETE, "", pod, container)
 	}
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false
@@ -324,11 +354,11 @@ func (p *VirtualKubeletProvider) GetPod(ctx context.Context, namespace, name str
 	}()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, namespace, common.NameKey, name)
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, name)
 
 	log.G(ctx).Infof("receive GetPod %q", name)
 
-	key, err := common.BuildKeyFromNames(namespace, name)
+	key, err := BuildKeyFromNames(namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +388,7 @@ func (p *VirtualKubeletProvider) GetPodStatus(ctx context.Context, namespace, na
 	defer span.End()
 
 	// Add namespace and name as attributes to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, namespace, common.NameKey, name)
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, name)
 
 	log.G(ctx).Infof("receive GetPodStatus %q", name)
 
@@ -387,7 +417,7 @@ func (p *VirtualKubeletProvider) GetPods(ctx context.Context) ([]*v1.Pod, error)
 }
 
 func (p *VirtualKubeletProvider) ConfigureNode(ctx context.Context, n *v1.Node) { // nolint:golint
-	ctx, span := trace.StartSpan(ctx, "KNOC.ConfigureNode") // nolint:staticcheck,ineffassign
+	_, span := trace.StartSpan(ctx, "KNOC.ConfigureNode") // nolint:staticcheck,ineffassign
 	defer span.End()
 
 	n.Status.Capacity = p.capacity()
@@ -487,7 +517,7 @@ func (p *VirtualKubeletProvider) nodeDaemonEndpoints() v1.NodeDaemonEndpoints {
 // GetStatsSummary returns dummy stats for all pods known by this provider.
 func (p *VirtualKubeletProvider) GetStatsSummary(ctx context.Context) (*stats.Summary, error) {
 	var span trace.Span
-	ctx, span = trace.StartSpan(ctx, "GetStatsSummary") //nolint: ineffassign,staticcheck
+	_, span = trace.StartSpan(ctx, "GetStatsSummary") //nolint: ineffassign,staticcheck
 	defer span.End()
 
 	// Grab the current timestamp so we can report it as the time the stats were generated.
@@ -600,7 +630,7 @@ func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
 
 func (p *VirtualKubeletProvider) initContainersActive(pod *v1.Pod) bool {
 	init_containers_active := len(pod.Spec.InitContainers)
-	for idx, _ := range pod.Spec.InitContainers {
+	for idx := range pod.Spec.InitContainers {
 		if pod.Status.InitContainerStatuses[idx].State.Terminated != nil {
 			init_containers_active--
 		}
@@ -613,7 +643,7 @@ func (p *VirtualKubeletProvider) startMainContainers(ctx context.Context, pod *v
 	now := metav1.NewTime(time.Now())
 
 	for idx, container := range pod.Spec.Containers {
-		err := RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
+		err := RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 
 		if err != nil {
 			pod.Status.ContainerStatuses[idx] = v1.ContainerStatus{
