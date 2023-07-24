@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var JID []JidStruct
@@ -31,6 +34,16 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+
+	if os.Getenv("KUBECONFIG") == "" {
+		time.Sleep(time.Second)
+	}
+
+	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+	if err != nil {
+		log.Println("Unable to create a valid config")
+	}
+	clientset, err = kubernetes.NewForConfig(config)
 
 	for _, pod := range req.Pods {
 		var metadata metav1.ObjectMeta
