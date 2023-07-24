@@ -18,10 +18,12 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"io/ioutil"
 	"os"
 
 	//"k8s.io/client-go/rest"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"net/http"
@@ -36,7 +38,24 @@ import (
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/node"
+	"github.com/virtual-kubelet/virtual-kubelet/node/api"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
+
+type PodHandler interface {
+	// List returns the list of reflected pods.
+	List(context.Context) ([]*v1.Pod, error)
+	// Exec executes a command in a container of a reflected pod.
+	Exec(ctx context.Context, namespace, pod, container string, cmd []string, attach api.AttachIO) error
+	// Attach attaches to a process that is already running inside an existing container of a reflected pod.
+	Attach(ctx context.Context, namespace, pod, container string, attach api.AttachIO) error
+	// PortForward forwards a connection from local to the ports of a reflected pod.
+	PortForward(ctx context.Context, namespace, pod string, port int32, stream io.ReadWriteCloser) error
+	// Logs retrieves the logs of a container of a reflected pod.
+	Logs(ctx context.Context, namespace, pod, container string, opts api.ContainerLogOpts) (io.ReadCloser, error)
+	// Stats retrieves the stats of the reflected pods.
+	Stats(ctx context.Context) (*stats.Summary, error)
+}
 
 type Config struct {
 	ConfigPath        string
@@ -66,7 +85,7 @@ func NewOpts() *Opts {
 
 func main() {
 	// Try from bash:
-	// INTERLINKCONFIGPATH=$PWD/kustomizations/InterLinkConfig.yaml CONFIGPATH=PWD/kustomizations/knoc-cfg.json NODENAME=test-vk ./bin/vk
+	// INTERLINKCONFIGPATH=$PWD/kustomizations/InterLinkConfig.yaml CONFIGPATH=$PWD/kustomizations/knoc-cfg.json NODENAME=test-vk ./bin/vk
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,8 +100,9 @@ func main() {
 		ConfigPath:      opts.ConfigPath,
 		NodeName:        opts.NodeName,
 		OperatingSystem: "Linux",
-		InternalIP:      "127.0.0.1",
-		DaemonPort:      10250,
+		// https://github.com/liqotech/liqo/blob/d8798732002abb7452c2ff1c99b3e5098f848c93/deployments/liqo/templates/liqo-gateway-deployment.yaml#L69
+		InternalIP: "127.0.0.1",
+		DaemonPort: 10250,
 	}
 
 	kubecfgFile, err := ioutil.ReadFile(os.Getenv("KUBECONFIG"))
@@ -122,6 +142,20 @@ func main() {
 	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/root.go#L195C49-L195C49
 	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/http.go#L76-L84
 	// // https://github.com/liqotech/liqo/blob/master/cmd/virtual-kubelet/root/http.go#L93
+
+	// handler := PodHandler{
+	// 	Stats: nc.GetStatsSummary
+	// }
+
+	// podRoutes := api.PodHandlerConfig{
+	// 	// RunInContainer:        handler.Exec,
+	// 	// AttachToContainer:     handler.Attach,
+	// 	// PortForward:           handler.PortForward,
+	// 	// GetContainerLogs:      handler.Logs,
+	// 	GetStatsSummary:       handler.Stats,
+	// 	// GetPodsFromKubernetes: handler.List,
+	// 	// GetPods:               handler.List,
+	// }
 
 	// err = setupHTTPServer(ctx, podProvider.PodHandler(), localClient, remoteConfig, c)
 	// if err != nil {
