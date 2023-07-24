@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 
-	common "github.com/CARV-ICS-FORTH/knoc/common"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
@@ -103,13 +102,13 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 	token := string(b)
 
 	switch mode {
-	case common.CREATE:
+	case CREATE:
 		//v1.Pod used only for secrets and volumes management; TO BE IMPLEMENTED
 		returnVal := createRequest(req, token)
 		log.L.Println(string(returnVal))
 		break
 
-	case common.DELETE:
+	case DELETE:
 		if NoReq > 0 {
 			NoReq--
 		} else {

@@ -7,13 +7,15 @@ metadata:
 spec:
   restartPolicy: OnFailure 
   containers:
-  - image: /cvmfs/unpacked.cern.ch/registry.hub.docker.com/cmssw/el8:x86_64
+  #- image: /cvmfs/unpacked.cern.ch/registry.hub.docker.com/cmssw/el8:x86_64
+  - image: busybox 
     volumeMounts:
     - name: foo
       mountPath: "/etc/foo"
       readOnly: true
     command:
-      - $HOME/script.sh
+      - sleep
+      - infinity
     imagePullPolicy: Always
     name: busyecho
   dnsPolicy: ClusterFirst

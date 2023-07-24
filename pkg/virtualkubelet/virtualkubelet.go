@@ -4,19 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"time"
 
-	"github.com/CARV-ICS-FORTH/knoc"
-	common "github.com/CARV-ICS-FORTH/knoc/common"
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	"github.com/virtual-kubelet/node-cli/manager"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
-	"github.com/virtual-kubelet/virtual-kubelet/node/api"
 	"github.com/virtual-kubelet/virtual-kubelet/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,57 +19,125 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
+const (
+	DefaultCPUCapacity    = "100"
+	DefaultMemoryCapacity = "3000G"
+	DefaultPodCapacity    = "10000"
+	DefaultListenPort     = 10250
+	NamespaceKey          = "namespace"
+	NameKey               = "name"
+	CREATE                = 0
+	DELETE                = 1
+)
+
+func BuildKeyFromNames(namespace string, name string) (string, error) {
+	return fmt.Sprintf("%s-%s", namespace, name), nil
+}
+
+func BuildKey(pod *v1.Pod) (string, error) {
+	if pod.ObjectMeta.Namespace == "" {
+		return "", fmt.Errorf("pod namespace not found")
+	}
+
+	if pod.ObjectMeta.Name == "" {
+		return "", fmt.Errorf("pod name not found")
+	}
+
+	return BuildKeyFromNames(pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+}
+
 type VirtualKubeletProvider struct {
-	knoc.KNOCProvider
-	nodeName           string
-	operatingSystem    string
-	internalIP         string
-	daemonEndpointPort int32
-	pods               map[string]*v1.Pod
-	config             VirtualKubeletConfig
-	startTime          time.Time
-	resourceManager    *manager.ResourceManager
-	notifier           func(*v1.Pod)
+	nodeName             string
+	node                 *v1.Node
+	operatingSystem      string
+	internalIP           string
+	daemonEndpointPort   int32
+	pods                 map[string]*v1.Pod
+	config               VirtualKubeletConfig
+	startTime            time.Time
+	notifier             func(*v1.Pod)
+	onNodeChangeCallback func(*v1.Node)
 }
 
 type VirtualKubeletConfig struct {
-	knoc.KNOCConfig
+	CPU    string `json:"cpu,omitempty"`
+	Memory string `json:"memory,omitempty"`
+	Pods   string `json:"pods,omitempty"`
 }
 
 // NewProviderConfig creates a new KNOCV0Provider. KNOC legacy provider does not implement the new asynchronous podnotifier interface
-func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem string, internalIP string, rm *manager.ResourceManager, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
+func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem string, internalIP string, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
 
 	// set defaults
 	if config.CPU == "" {
-		config.CPU = common.DefaultCPUCapacity
+		config.CPU = DefaultCPUCapacity
 	}
 	if config.Memory == "" {
-		config.Memory = common.DefaultMemoryCapacity
+		config.Memory = DefaultMemoryCapacity
 	}
 	if config.Pods == "" {
-		config.Pods = common.DefaultPodCapacity
+		config.Pods = DefaultPodCapacity
 	}
+
+	node := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			//Labels:      labels.Merge(lbls, cfg.ExtraLabels),
+			//Annotations: cfg.ExtraAnnotations,
+		},
+		Spec: v1.NodeSpec{
+			// Taints: []v1.Taint{{
+			// 	Key:   "virtual-node.liqo.io/not-allowed",
+			// 	Value:  strconv.FormatBool(true),
+			// 	Effect: corev1.TaintEffectNoExecute,
+			// }},
+		},
+		Status: v1.NodeStatus{
+			// NodeInfo: v1.NodeSystemInfo{
+			// 	KubeletVersion:  Version,
+			// 	Architecture:    architecture,
+			// 	OperatingSystem: linuxos,
+			// },
+			Addresses:       []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: internalIP}},
+			DaemonEndpoints: v1.NodeDaemonEndpoints{KubeletEndpoint: v1.DaemonEndpoint{Port: int32(daemonEndpointPort)}},
+			Capacity: v1.ResourceList{
+				"cpu":    resource.MustParse(config.CPU),
+				"memory": resource.MustParse(config.Memory),
+				"pods":   resource.MustParse(config.Pods),
+			},
+			Allocatable: v1.ResourceList{
+				"cpu":    resource.MustParse(config.CPU),
+				"memory": resource.MustParse(config.Memory),
+				"pods":   resource.MustParse(config.Pods),
+			},
+			Conditions: nodeConditions(),
+		},
+	}
+
 	provider := VirtualKubeletProvider{
 		nodeName:           nodeName,
+		node:               &node,
 		operatingSystem:    operatingSystem,
 		internalIP:         internalIP,
 		daemonEndpointPort: daemonEndpointPort,
-		resourceManager:    rm,
 		pods:               make(map[string]*v1.Pod),
 		config:             config,
 		startTime:          time.Now(),
+		onNodeChangeCallback: func(node *v1.Node) {
+			return
+		},
 	}
 
 	return &provider, nil
 }
 
 // NewProvider creates a new Provider, which implements the PodNotifier interface
-func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP string, rm *manager.ResourceManager, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
+func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP string, daemonEndpointPort int32) (*VirtualKubeletProvider, error) {
 	config, err := loadConfig(providerConfig, nodeName)
 	if err != nil {
 		return nil, err
 	}
-	return NewProviderConfig(config, nodeName, operatingSystem, internalIP, rm, daemonEndpointPort)
+	return NewProviderConfig(config, nodeName, operatingSystem, internalIP, daemonEndpointPort)
 }
 
 // loadConfig loads the given json configuration files and yaml to communicate with InterLink.
@@ -95,13 +158,13 @@ func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, e
 	if _, exist := configMap[nodeName]; exist {
 		config = configMap[nodeName]
 		if config.CPU == "" {
-			config.CPU = common.DefaultCPUCapacity
+			config.CPU = DefaultCPUCapacity
 		}
 		if config.Memory == "" {
-			config.Memory = common.DefaultMemoryCapacity
+			config.Memory = DefaultMemoryCapacity
 		}
 		if config.Pods == "" {
-			config.Pods = common.DefaultPodCapacity
+			config.Pods = DefaultPodCapacity
 		}
 	}
 
@@ -117,6 +180,40 @@ func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, e
 	return config, nil
 }
 
+func (p *VirtualKubeletProvider) GetNode() *v1.Node {
+	return p.node
+}
+
+func (p *VirtualKubeletProvider) NotifyNodeStatus(ctx context.Context, f func(*v1.Node)) {
+	p.onNodeChangeCallback = f
+}
+
+func (p *VirtualKubeletProvider) Ping(ctx context.Context) error {
+	// if p.pingDisabled {
+	// 	return nil
+	// }
+
+	// start := time.Now()
+	// klog.V(4).Infof("Checking whether the remote API server is ready")
+
+	// // Get the foreigncluster using the given clusterID
+	// fc, err := foreignclusterutils.GetForeignClusterByIDWithDynamicClient(ctx, p.dynClient, p.foreignClusterID)
+	// if err != nil {
+	// 	klog.Error(err)
+	// 	return err
+	// }
+
+	// // Check the foreign API server status
+	// if !foreignclusterutils.IsAPIServerReady(fc) {
+	// 	return fmt.Errorf("[%s] API server readiness check failed", fc.Spec.ClusterIdentity.ClusterName)
+	// }
+
+	// klog.V(4).Infof("[%s] API server readiness check completed successfully in %v",
+	// 	fc.Spec.ClusterIdentity.ClusterName, time.Since(start))
+	// return nil
+	return nil
+}
+
 // CreatePod accepts a Pod definition and stores it in memory.
 func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	ctx, span := trace.StartSpan(ctx, "CreatePod")
@@ -125,8 +222,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	defer span.End()
 	distribution := "docker://"
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
-	key, err := common.BuildKey(pod)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -150,7 +247,7 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 		// run init container with remote execution enabled
 		for _, container := range pod.Spec.InitContainers {
 			// MUST TODO: Run init containers sequentialy and NOT all-together
-			RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
+			RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 		}
 
 		pod.Status = v1.PodStatus{
@@ -200,7 +297,7 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 		var err error
 
 		if !hasInitContainers {
-			err = RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
+			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 
 		}
 		if err != nil {
@@ -242,11 +339,11 @@ func (p *VirtualKubeletProvider) UpdatePod(ctx context.Context, pod *v1.Pod) err
 	defer span.End()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
 
 	log.G(ctx).Infof("receive UpdatePod %q", pod.Name)
 
-	key, err := common.BuildKey(pod)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -263,11 +360,11 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	defer span.End()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, pod.Namespace, common.NameKey, pod.Name)
+	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
 
 	log.G(ctx).Infof("receive DeletePod %q", pod.Name)
 
-	key, err := common.BuildKey(pod)
+	key, err := BuildKey(pod)
 	if err != nil {
 		return err
 	}
@@ -281,10 +378,10 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	pod.Status.Reason = "KNOCProviderPodDeleted"
 
 	for _, container := range pod.Spec.Containers {
-		RemoteExecution(p, ctx, common.DELETE, "", pod, container)
+		RemoteExecution(p, ctx, DELETE, "", pod, container)
 	}
 	for _, container := range pod.Spec.InitContainers {
-		RemoteExecution(p, ctx, common.DELETE, "", pod, container)
+		RemoteExecution(p, ctx, DELETE, "", pod, container)
 	}
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false
@@ -324,11 +421,11 @@ func (p *VirtualKubeletProvider) GetPod(ctx context.Context, namespace, name str
 	}()
 
 	// Add the pod's coordinates to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, namespace, common.NameKey, name)
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, name)
 
 	log.G(ctx).Infof("receive GetPod %q", name)
 
-	key, err := common.BuildKeyFromNames(namespace, name)
+	key, err := BuildKeyFromNames(namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -339,18 +436,6 @@ func (p *VirtualKubeletProvider) GetPod(ctx context.Context, namespace, name str
 	return nil, errdefs.NotFoundf("pod \"%s/%s\" is not known to the provider", namespace, name)
 }
 
-// GetContainerLogs retrieves the logs of a container by name from the provider.
-func (p *VirtualKubeletProvider) GetContainerLogs(ctx context.Context, namespace, podName, containerName string, opts api.ContainerLogOpts) (io.ReadCloser, error) {
-
-	return nil, fmt.Errorf("NOT IMPLEMENTED")
-}
-
-// RunInContainer executes a command in a container in the pod, copying data
-// between in/out/err and the container's stdin/stdout/stderr.
-func (p *VirtualKubeletProvider) RunInContainer(ctx context.Context, namespace, name, container string, cmd []string, attach api.AttachIO) error {
-	return fmt.Errorf("NOT IMPLEMENTED")
-}
-
 // GetPodStatus returns the status of a pod by name that is "running".
 // returns nil if a pod by that name is not found.
 func (p *VirtualKubeletProvider) GetPodStatus(ctx context.Context, namespace, name string) (*v1.PodStatus, error) {
@@ -358,7 +443,7 @@ func (p *VirtualKubeletProvider) GetPodStatus(ctx context.Context, namespace, na
 	defer span.End()
 
 	// Add namespace and name as attributes to the current span.
-	ctx = addAttributes(ctx, span, common.NamespaceKey, namespace, common.NameKey, name)
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, name)
 
 	log.G(ctx).Infof("receive GetPodStatus %q", name)
 
@@ -386,37 +471,9 @@ func (p *VirtualKubeletProvider) GetPods(ctx context.Context) ([]*v1.Pod, error)
 	return pods, nil
 }
 
-func (p *VirtualKubeletProvider) ConfigureNode(ctx context.Context, n *v1.Node) { // nolint:golint
-	ctx, span := trace.StartSpan(ctx, "KNOC.ConfigureNode") // nolint:staticcheck,ineffassign
-	defer span.End()
-
-	n.Status.Capacity = p.capacity()
-	n.Status.Allocatable = p.capacity()
-	n.Status.Conditions = p.nodeConditions()
-	n.Status.Addresses = p.nodeAddresses()
-	n.Status.DaemonEndpoints = p.nodeDaemonEndpoints()
-	os := p.operatingSystem
-	if os == "" {
-		os = "Linux"
-	}
-	n.Status.NodeInfo.OperatingSystem = os
-	n.Status.NodeInfo.Architecture = "amd64"
-	n.ObjectMeta.Labels["alpha.service-controller.kubernetes.io/exclude-balancer"] = "true"
-	n.ObjectMeta.Labels["node.kubernetes.io/exclude-from-external-load-balancers"] = "true"
-}
-
-// Capacity returns a resource list containing the capacity limits.
-func (p *VirtualKubeletProvider) capacity() v1.ResourceList {
-	return v1.ResourceList{
-		"cpu":    resource.MustParse(p.config.CPU),
-		"memory": resource.MustParse(p.config.Memory),
-		"pods":   resource.MustParse(p.config.Pods),
-	}
-}
-
 // NodeConditions returns a list of conditions (Ready, OutOfDisk, etc), for updates to the node status
 // within Kubernetes.
-func (p *VirtualKubeletProvider) nodeConditions() []v1.NodeCondition {
+func nodeConditions() []v1.NodeCondition {
 	// TODO: Make this configurable
 	return []v1.NodeCondition{
 		{
@@ -463,25 +520,54 @@ func (p *VirtualKubeletProvider) nodeConditions() []v1.NodeCondition {
 
 }
 
-// NodeAddresses returns a list of addresses for the node status
-// within Kubernetes.
-func (p *VirtualKubeletProvider) nodeAddresses() []v1.NodeAddress {
-	return []v1.NodeAddress{
-		{
-			Type:    "InternalIP",
-			Address: p.internalIP,
-		},
+// NotifyPods is called to set a pod notifier callback function. This should be called before any operations are done
+// within the provider.
+func (p *VirtualKubeletProvider) NotifyPods(ctx context.Context, f func(*v1.Pod)) {
+	p.notifier = f
+	go p.statusLoop(ctx)
+}
+
+func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
+	t := time.NewTimer(5 * time.Second)
+	if !t.Stop() {
+		<-t.C
+	}
+
+	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
+	if err != nil {
+		fmt.Print(err)
+	}
+	token := string(b)
+
+	for {
+		t.Reset(5 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+
+		b, err = os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
+		if err != nil {
+			fmt.Print(err)
+		}
+		token = string(b)
+		checkPodsStatus(p, ctx, token)
 	}
 }
 
-// NodeDaemonEndpoints returns NodeDaemonEndpoints for the node status
-// within Kubernetes.
-func (p *VirtualKubeletProvider) nodeDaemonEndpoints() v1.NodeDaemonEndpoints {
-	return v1.NodeDaemonEndpoints{
-		KubeletEndpoint: v1.DaemonEndpoint{
-			Port: p.daemonEndpointPort,
-		},
+// addAttributes adds the specified attributes to the provided span.
+// attrs must be an even-sized list of string arguments.
+// Otherwise, the span won't be modified.
+// TODO: Refactor and move to a "tracing utilities" package.
+func addAttributes(ctx context.Context, span trace.Span, attrs ...string) context.Context {
+	if len(attrs)%2 == 1 {
+		return ctx
 	}
+	for i := 0; i < len(attrs); i += 2 {
+		ctx = span.WithField(ctx, attrs[i], attrs[i+1])
+	}
+	return ctx
 }
 
 // GetStatsSummary returns dummy stats for all pods known by this provider.
@@ -560,103 +646,4 @@ func (p *VirtualKubeletProvider) GetStatsSummary(ctx context.Context) (*stats.Su
 
 	// Return the dummy stats.
 	return res, nil
-}
-
-// NotifyPods is called to set a pod notifier callback function. This should be called before any operations are done
-// within the provider.
-func (p *VirtualKubeletProvider) NotifyPods(ctx context.Context, f func(*v1.Pod)) {
-	p.notifier = f
-	go p.statusLoop(ctx)
-}
-
-func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
-	t := time.NewTimer(5 * time.Second)
-	if !t.Stop() {
-		<-t.C
-	}
-
-	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
-	if err != nil {
-		fmt.Print(err)
-	}
-	token := string(b)
-
-	for {
-		t.Reset(5 * time.Second)
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-
-		b, err = os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
-		if err != nil {
-			fmt.Print(err)
-		}
-		token = string(b)
-		checkPodsStatus(p, ctx, token)
-	}
-}
-
-func (p *VirtualKubeletProvider) initContainersActive(pod *v1.Pod) bool {
-	init_containers_active := len(pod.Spec.InitContainers)
-	for idx, _ := range pod.Spec.InitContainers {
-		if pod.Status.InitContainerStatuses[idx].State.Terminated != nil {
-			init_containers_active--
-		}
-	}
-	return init_containers_active != 0
-}
-
-func (p *VirtualKubeletProvider) startMainContainers(ctx context.Context, pod *v1.Pod) {
-	distribution := "docker://"
-	now := metav1.NewTime(time.Now())
-
-	for idx, container := range pod.Spec.Containers {
-		err := RemoteExecution(p, ctx, common.CREATE, distribution+container.Image, pod, container)
-
-		if err != nil {
-			pod.Status.ContainerStatuses[idx] = v1.ContainerStatus{
-				Name:         container.Name,
-				Image:        container.Image,
-				Ready:        false,
-				RestartCount: 1,
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
-						Message:   "Could not reach remote cluster",
-						StartedAt: now,
-						ExitCode:  130,
-					},
-				},
-			}
-			pod.Status.Phase = v1.PodFailed
-			continue
-		}
-		pod.Status.ContainerStatuses[idx] = v1.ContainerStatus{
-			Name:         container.Name,
-			Image:        container.Image,
-			Ready:        true,
-			RestartCount: 1,
-			State: v1.ContainerState{
-				Running: &v1.ContainerStateRunning{
-					StartedAt: now,
-				},
-			},
-		}
-
-	}
-}
-
-// addAttributes adds the specified attributes to the provided span.
-// attrs must be an even-sized list of string arguments.
-// Otherwise, the span won't be modified.
-// TODO: Refactor and move to a "tracing utilities" package.
-func addAttributes(ctx context.Context, span trace.Span, attrs ...string) context.Context {
-	if len(attrs)%2 == 1 {
-		return ctx
-	}
-	for i := 0; i < len(attrs); i += 2 {
-		ctx = span.WithField(ctx, attrs[i], attrs[i+1])
-	}
-	return ctx
 }
