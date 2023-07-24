@@ -7,6 +7,10 @@ github.com/containerd/containerd/log
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/docker/spdystream v0.0.0-20170912183627-bc6354cbbc29
+## explicit
+github.com/docker/spdystream
+github.com/docker/spdystream/spdy
 # github.com/gogo/protobuf v1.2.1
 ## explicit
 github.com/gogo/protobuf/proto
@@ -36,6 +40,9 @@ github.com/google/gofuzz
 github.com/googleapis/gnostic/OpenAPIv2
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
+# github.com/gorilla/mux v1.7.0
+## explicit
+github.com/gorilla/mux
 # github.com/hashicorp/golang-lru v0.5.1
 ## explicit
 github.com/hashicorp/golang-lru
@@ -73,7 +80,26 @@ github.com/virtual-kubelet/virtual-kubelet/internal/manager
 github.com/virtual-kubelet/virtual-kubelet/log
 github.com/virtual-kubelet/virtual-kubelet/log/logrus
 github.com/virtual-kubelet/virtual-kubelet/node
+github.com/virtual-kubelet/virtual-kubelet/node/api
 github.com/virtual-kubelet/virtual-kubelet/trace
+# go.opencensus.io v0.21.0
+## explicit
+go.opencensus.io
+go.opencensus.io/internal
+go.opencensus.io/internal/tagencoding
+go.opencensus.io/metric/metricdata
+go.opencensus.io/metric/metricproducer
+go.opencensus.io/plugin/ochttp
+go.opencensus.io/plugin/ochttp/propagation/b3
+go.opencensus.io/resource
+go.opencensus.io/stats
+go.opencensus.io/stats/internal
+go.opencensus.io/stats/view
+go.opencensus.io/tag
+go.opencensus.io/trace
+go.opencensus.io/trace/internal
+go.opencensus.io/trace/propagation
+go.opencensus.io/trace/tracestate
 # golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 ## explicit; go 1.11
 golang.org/x/crypto/ssh/terminal
@@ -85,6 +111,7 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 ## explicit; go 1.11
 golang.org/x/oauth2
@@ -195,11 +222,14 @@ k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/diff
 k8s.io/apimachinery/pkg/util/errors
 k8s.io/apimachinery/pkg/util/framer
+k8s.io/apimachinery/pkg/util/httpstream
+k8s.io/apimachinery/pkg/util/httpstream/spdy
 k8s.io/apimachinery/pkg/util/intstr
 k8s.io/apimachinery/pkg/util/json
 k8s.io/apimachinery/pkg/util/mergepatch
 k8s.io/apimachinery/pkg/util/naming
 k8s.io/apimachinery/pkg/util/net
+k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/pkg/util/runtime
 k8s.io/apimachinery/pkg/util/sets
 k8s.io/apimachinery/pkg/util/strategicpatch
@@ -210,7 +240,12 @@ k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
+k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
+# k8s.io/apiserver v0.0.0 => k8s.io/apiserver v0.0.0-20190805142138-368b2058237c
+## explicit; go 1.12
+k8s.io/apiserver/pkg/server/httplog
+k8s.io/apiserver/pkg/util/wsstream
 # k8s.io/client-go v11.0.0+incompatible => k8s.io/client-go v0.0.0-20190805141520-2fe0317bcee0
 ## explicit; go 1.12
 k8s.io/client-go/discovery
@@ -273,9 +308,12 @@ k8s.io/client-go/tools/pager
 k8s.io/client-go/tools/record
 k8s.io/client-go/tools/record/util
 k8s.io/client-go/tools/reference
+k8s.io/client-go/tools/remotecommand
 k8s.io/client-go/transport
+k8s.io/client-go/transport/spdy
 k8s.io/client-go/util/cert
 k8s.io/client-go/util/connrotation
+k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
@@ -296,10 +334,12 @@ k8s.io/kubernetes/pkg/apis/core/v1/helper
 k8s.io/kubernetes/pkg/fieldpath
 k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1
 k8s.io/kubernetes/pkg/kubelet/envvars
+k8s.io/kubernetes/pkg/kubelet/server/remotecommand
 k8s.io/kubernetes/third_party/forked/golang/expansion
 # k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
 ## explicit; go 1.12
 k8s.io/utils/buffer
+k8s.io/utils/exec
 k8s.io/utils/integer
 k8s.io/utils/trace
 # sigs.k8s.io/yaml v1.1.0
