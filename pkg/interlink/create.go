@@ -11,6 +11,7 @@ import (
 )
 
 func CreateHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("InterLink: received Create call")
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -34,6 +35,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
+	log.Println("InterLink: forwarding Create call to sidecar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatal(err)
