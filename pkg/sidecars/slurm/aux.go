@@ -92,7 +92,6 @@ func prepare_mounts(container v1.Container, pod *v1.Pod) []string {
 
 			} else if podVolumeSpec != nil && podVolumeSpec.Secret != nil {
 				secretsPaths, envs := mountSecrets(container, pod)
-				fmt.Println(secretsPaths)
 				for i, path := range secretsPaths {
 					if strings.Compare(os.Getenv("SHARED_FS"), "true") != 0 {
 						dirs := strings.Split(path, ":")

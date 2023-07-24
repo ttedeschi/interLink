@@ -129,6 +129,10 @@ Detailed explanation of the InterLink config file key values.
 | ScancelPath | path to your Slurm's scancel binary | 
 | VKTokenFile | path to a file containing your token fot OAuth2 proxy authentication. |
 | CommandPrefix | here you can specify a prefix for the programmatically generated script (for the slurm plugin). Basically, if you want to run anything before the script itself, put it here. |
+| ExportPodData | Set it to true if you want to export Pod's ConfigMaps and Secrets as mountpoints in your Singularity container |
+| DataRootFolder | Specify where to store the exported ConfigMaps/Secrets locally |
+| ServiceAccount | The Service Account name to generate a limited KubeConfig to be passed to your Sidecars |
+| Namespace | Namespace where Pods in your K8S will be registered |
 | Tsocks | true or false values only. Enables or Disables the use of tsocks library to allow proxy networking. Only implemented for the Slurm sidecar at the moment. |
 | TsocksPath | path to your tsocks library. |
 | TsocksLoginNode | specify an existing node to ssh to. It will be your "window to the external world" |
