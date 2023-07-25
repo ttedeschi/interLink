@@ -79,10 +79,19 @@ func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem st
 		config.Pods = DefaultPodCapacity
 	}
 
+	lbls := map[string]string{
+		"alpha.service-controller.kubernetes.io/exclude-balancer": "true",
+		"beta.kubernetes.io/os":                                   "linux",
+		"kubernetes.io/hostname":                                  "test-vk",
+		"kubernetes.io/role":                                      "agent",
+		"node.kubernetes.io/exclude-from-external-load-balancers": "true",
+		"type": "virtual-kubelet",
+	}
+
 	node := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeName,
-			//Labels:      labels.Merge(lbls, cfg.ExtraLabels),
+			Name:   nodeName,
+			Labels: lbls,
 			//Annotations: cfg.ExtraAnnotations,
 		},
 		Spec: v1.NodeSpec{
@@ -144,7 +153,7 @@ func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP st
 func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, err error) {
 
 	commonIL.NewInterLinkConfig()
-	commonIL.NewServiceAccount()
+	//commonIL.NewServiceAccount()
 
 	data, err := ioutil.ReadFile(providerConfig)
 	if err != nil {

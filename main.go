@@ -18,12 +18,16 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 
 	//"k8s.io/client-go/rest"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"net/http"
@@ -39,8 +43,17 @@ import (
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/node"
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/record"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
+
+func PodInformerFilter(node string) informers.SharedInformerOption {
+	return informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+		options.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", node).String()
+	})
+}
 
 type PodHandler interface {
 	// List returns the list of reflected pods.
@@ -92,6 +105,7 @@ func main() {
 	defer cancel()
 
 	logger := logrus.StandardLogger()
+	logger.SetLevel(logrus.DebugLevel)
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
 
 	opts := NewOpts()
@@ -162,7 +176,45 @@ func main() {
 	// log.G(ctx).Fatal(err)
 	// }
 
-	if err := nc.Run(ctx); err != nil {
+	go func() error {
+		err = nc.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("error running the node: %w", err)
+		}
+		return nil
+	}()
+
+	eb := record.NewBroadcaster()
+	EventRecorder := eb.NewRecorder(scheme.Scheme, v1.EventSource{Component: path.Join(opts.NodeName, "pod-controller")})
+
+	podInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		localClient,
+		100,
+		PodInformerFilter(opts.NodeName),
+	)
+
+	scmInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		localClient,
+		100,
+	)
+
+	podControllerConfig := node.PodControllerConfig{
+		PodClient:         localClient.CoreV1(),
+		Provider:          nodeProvider,
+		EventRecorder:     EventRecorder,
+		PodInformer:       podInformerFactory.Core().V1().Pods(),
+		SecretInformer:    scmInformerFactory.Core().V1().Secrets(),
+		ConfigMapInformer: scmInformerFactory.Core().V1().ConfigMaps(),
+		ServiceInformer:   scmInformerFactory.Core().V1().Services(),
+	}
+
+	pc, err := node.NewPodController(podControllerConfig) // <-- instatiates the pod controller
+	if err != nil {
 		log.G(ctx).Fatal(err)
 	}
+	err = pc.Run(ctx, 1) // <-- starts watching for pods to be scheduled on the node
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
+
 }
