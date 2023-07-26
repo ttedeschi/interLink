@@ -18,62 +18,86 @@ import (
 
 var NoReq uint8
 
-func createRequest(pod commonIL.Request, token string) []byte {
+func createRequest(pod commonIL.Request, token string) ([]byte, error) {
 	var returnValue, _ = json.Marshal(commonIL.PodStatus{PodStatus: commonIL.UNKNOWN})
 
 	bodyBytes, err := json.Marshal(pod)
-	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/create", reader)
-
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
+	}
+	reader := bytes.NewReader(bodyBytes)
+	req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/create", reader)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
 	}
 
 	returnValue, _ = ioutil.ReadAll(resp.Body)
 	var response commonIL.PodStatus
-	json.Unmarshal(returnValue, &response)
+	err = json.Unmarshal(returnValue, &response)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
+	}
 
-	return returnValue
+	return returnValue, nil
 }
 
-func deleteRequest(pod commonIL.Request, token string) []byte {
+func deleteRequest(pod commonIL.Request, token string) ([]byte, error) {
 	var returnValue, _ = json.Marshal(commonIL.PodStatus{PodStatus: commonIL.UNKNOWN})
 
 	bodyBytes, err := json.Marshal(pod)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
+	}
 	reader := bytes.NewReader(bodyBytes)
 	req, err := http.NewRequest(http.MethodDelete, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/delete", reader)
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
 	}
 
 	returnValue, _ = ioutil.ReadAll(resp.Body)
 	var response commonIL.PodStatus
-	json.Unmarshal(returnValue, &response)
+	err = json.Unmarshal(returnValue, &response)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
+	}
 
-	return returnValue
+	return returnValue, nil
 }
 
-func statusRequest(podsList commonIL.Request, token string) []byte {
+func statusRequest(podsList commonIL.Request, token string) ([]byte, error) {
 	var returnValue []byte
 	var response []commonIL.StatusResponse
 
 	bodyBytes, err := json.Marshal(podsList)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
+	}
 	reader := bytes.NewReader(bodyBytes)
 	req, err := http.NewRequest(http.MethodGet, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/status", reader)
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
 	}
 
 	log.L.Println(string(bodyBytes))
@@ -83,12 +107,17 @@ func statusRequest(podsList commonIL.Request, token string) []byte {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.L.Error(err)
+		return nil, err
 	}
 
 	returnValue, _ = ioutil.ReadAll(resp.Body)
-	json.Unmarshal(returnValue, &response)
+	err = json.Unmarshal(returnValue, &response)
+	if err != nil {
+		log.L.Error(err)
+		return nil, err
+	}
 
-	return returnValue
+	return returnValue, nil
 }
 
 func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, imageLocation string, pod *v1.Pod, container v1.Container) error {
@@ -104,33 +133,51 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 	switch mode {
 	case CREATE:
 		//v1.Pod used only for secrets and volumes management; TO BE IMPLEMENTED
-		returnVal := createRequest(req, token)
-		log.L.Println(string(returnVal))
+		returnVal, err := createRequest(req, token)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return err
+		}
+		log.G(ctx).Info(string(returnVal))
 		break
 
 	case DELETE:
 		if NoReq > 0 {
 			NoReq--
 		} else {
-			returnVal := deleteRequest(req, token)
-			log.L.Println(string(returnVal))
+			returnVal, err := deleteRequest(req, token)
+			if err != nil {
+				log.G(ctx).Error(err)
+				return err
+			}
+			log.G(ctx).Info(string(returnVal))
 		}
 		break
 	}
 	return nil
 }
 
-func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token string) {
+func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token string) error {
 	if len(p.pods) == 0 {
-		return
+		return nil
 	}
 	var returnVal []byte
 	var ret commonIL.StatusResponse
 	var PodsList commonIL.Request
 	PodsList.Pods = p.pods
+	log.G(ctx).Info(p.pods)
 
-	returnVal = statusRequest(PodsList, token)
-	json.Unmarshal(returnVal, &ret)
+	returnVal, err := statusRequest(PodsList, token)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return err
+	}
+
+	err = json.Unmarshal(returnVal, &ret)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return err
+	}
 
 	for podIndex, podStatus := range ret.PodStatus {
 		if podStatus.PodStatus == 1 {
@@ -144,10 +191,12 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 
 			execReturn, _ := shell.Execute()
 			if execReturn.Stderr != "" {
-				fmt.Println("Could not delete pod " + ret.PodName[podIndex].Name)
+				log.G(ctx).Error(fmt.Errorf("Could not delete pod " + ret.PodName[podIndex].Name))
+				return fmt.Errorf("Could not delete pod " + ret.PodName[podIndex].Name)
 			}
 		}
 	}
 
 	log.L.Println(ret)
+	return nil
 }
