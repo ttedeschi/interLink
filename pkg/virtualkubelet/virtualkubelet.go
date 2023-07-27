@@ -153,7 +153,7 @@ func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP st
 func loadConfig(providerConfig, nodeName string) (config VirtualKubeletConfig, err error) {
 
 	commonIL.NewInterLinkConfig()
-	//commonIL.NewServiceAccount()
+	commonIL.NewServiceAccount()
 
 	data, err := ioutil.ReadFile(providerConfig)
 	if err != nil {
@@ -256,7 +256,10 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 		// run init container with remote execution enabled
 		for _, container := range pod.Spec.InitContainers {
 			// MUST TODO: Run init containers sequentialy and NOT all-together
-			RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
+			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
+			if err != nil {
+				return err
+			}
 		}
 
 		pod.Status = v1.PodStatus{
@@ -307,24 +310,9 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 
 		if !hasInitContainers {
 			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
-
-		}
-		if err != nil {
-			pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, v1.ContainerStatus{
-				Name:         container.Name,
-				Image:        container.Image,
-				Ready:        false,
-				RestartCount: 1,
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
-						Message:   "Could not reach remote cluster",
-						StartedAt: now,
-						ExitCode:  130,
-					},
-				},
-			})
-			pod.Status.Phase = v1.PodFailed
-			continue
+			if err != nil {
+				return err
+			}
 		}
 		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, v1.ContainerStatus{
 			Name:         container.Name,
@@ -387,10 +375,21 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	pod.Status.Reason = "KNOCProviderPodDeleted"
 
 	for _, container := range pod.Spec.Containers {
-		RemoteExecution(p, ctx, DELETE, "", pod, container)
+		err = RemoteExecution(p, ctx, DELETE, "", pod, container)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return err
+		}
+
 	}
+
 	for _, container := range pod.Spec.InitContainers {
-		RemoteExecution(p, ctx, DELETE, "", pod, container)
+		err = RemoteExecution(p, ctx, DELETE, "", pod, container)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return err
+		}
+
 	}
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false
@@ -542,6 +541,8 @@ func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
 		<-t.C
 	}
 
+	log.G(ctx).Info("statusLoop")
+
 	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
 	if err != nil {
 		fmt.Print(err)
@@ -562,6 +563,10 @@ func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
 		}
 		token = string(b)
 		checkPodsStatus(p, ctx, token)
+		if err != nil {
+			log.G(ctx).Error(err)
+		}
+		log.G(ctx).Info("statusLoop=end")
 	}
 }
 

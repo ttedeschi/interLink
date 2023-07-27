@@ -23,12 +23,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	//"k8s.io/client-go/rest"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
 
 	"net/http"
 
@@ -45,7 +48,6 @@ import (
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/record"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -183,19 +185,24 @@ func main() {
 		}
 		return nil
 	}()
+	//<-nc.Ready()
+	//close(nc)
 
 	eb := record.NewBroadcaster()
+
 	EventRecorder := eb.NewRecorder(scheme.Scheme, v1.EventSource{Component: path.Join(opts.NodeName, "pod-controller")})
+
+	resync, err := time.ParseDuration("30s")
 
 	podInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		localClient,
-		100,
+		resync,
 		PodInformerFilter(opts.NodeName),
 	)
 
 	scmInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		localClient,
-		100,
+		resync,
 	)
 
 	podControllerConfig := node.PodControllerConfig{
@@ -207,6 +214,30 @@ func main() {
 		ConfigMapInformer: scmInformerFactory.Core().V1().ConfigMaps(),
 		ServiceInformer:   scmInformerFactory.Core().V1().Services(),
 	}
+
+	// stop signal for the informer
+	stopper := make(chan struct{})
+	defer close(stopper)
+
+	// start informers ->
+	go podInformerFactory.Start(stopper)
+	go scmInformerFactory.Start(stopper)
+
+	// start to sync and call list
+	if !cache.WaitForCacheSync(stopper, podInformerFactory.Core().V1().Pods().Informer().HasSynced) {
+		log.G(ctx).Fatal(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
+
+	// // DEBUG
+	// lister := podInformerFactory.Core().V1().Pods().Lister().Pods("")
+	// pods, err := lister.List(labels.Everything())
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// for pod := range pods {
+	// 	fmt.Println("pods:", pods[pod].Name)
+	// }
 
 	pc, err := node.NewPodController(podControllerConfig) // <-- instatiates the pod controller
 	if err != nil {

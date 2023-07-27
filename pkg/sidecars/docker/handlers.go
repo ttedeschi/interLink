@@ -3,22 +3,24 @@ package docker
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
+	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Docker Sidecar: received GetStatus call")
+	log.G(Ctx).Info("Docker Sidecar: received GetStatus call")
 	var resp commonIL.StatusResponse
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.G(Ctx).Error(err)
 	}
 
 	var req commonIL.Request
@@ -26,8 +28,8 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, pod := range req.Pods {
 		for _, container := range pod.Spec.Containers {
-			log.Println("Getting status for container " + container.Name)
-			cmd := []string{"ps -aqf name= " + container.Name}
+			log.G(Ctx).Debug("- Getting status for container " + container.Name)
+			cmd := []string{"ps -aqf name=" + container.Name}
 
 			shell := exec.ExecTask{
 				Command: "docker",
@@ -38,18 +40,18 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
 			if err != nil {
-				log.Println(err)
+				log.G(Ctx).Error(err)
 				return
 			}
 
 			if execReturn.Stderr != "" {
-				log.Println("Failed to get status for " + container.Name + " : " + execReturn.Stdout)
+				log.G(Ctx).Error("-- Failed to get status for " + container.Name + " : " + execReturn.Stdout)
 			} else {
-				log.Println("Got status for " + container.Name)
+				log.G(Ctx).Info("-- Container " + container.Name + " is running")
 			}
 
 			resp.PodName = append(resp.PodName, commonIL.PodName{Name: pod.Name})
-			log.Println(execReturn.Stderr, execReturn.Stdout)
+			log.G(Ctx).Debug(execReturn.Stderr, execReturn.Stdout)
 
 			if execReturn.Stdout == "" {
 				resp.PodStatus = append(resp.PodStatus, commonIL.PodStatus{PodStatus: commonIL.STOP})
@@ -66,11 +68,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Docker Sidecar: received Create call")
+	log.G(Ctx).Info("Docker Sidecar: received Create call")
 	var execReturn exec.ExecResult
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.G(Ctx).Error(err)
 	}
 
 	var req commonIL.Request
@@ -78,8 +80,12 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, pod := range req.Pods {
 		for _, container := range pod.Spec.Containers {
-			log.Println("Creating container " + container.Name)
+			log.G(Ctx).Info("- Creating container " + container.Name)
 			cmd := []string{"run", "-d", "--name", container.Name}
+
+			if commonIL.InterLinkConfigInst.ExportPodData {
+				cmd = append(cmd, prepare_mounts(container, pod))
+			}
 
 			cmd = append(cmd, container.Image)
 
@@ -98,14 +104,14 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 			execReturn, err = shell.Execute()
 			if err != nil {
-				log.Println(err)
+				log.G(Ctx).Error(err)
 				return
 			}
 
 			if execReturn.Stderr != "" {
-				log.Println("Unable to create container " + container.Name + " : " + execReturn.Stderr)
+				log.G(Ctx).Error("Unable to create container " + container.Name + " : " + execReturn.Stderr)
 			} else {
-				log.Println("Successfully create container " + container.Name)
+				log.G(Ctx).Info("-- Created container " + container.Name)
 			}
 
 			shell = exec.ExecTask{
@@ -117,11 +123,11 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn, err = shell.Execute()
 			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 			if execReturn.Stderr != "" {
-				log.Println("Failed to retrieve " + container.Name + " ID : " + execReturn.Stderr)
+				log.G(Ctx).Error("Failed to retrieve " + container.Name + " ID : " + execReturn.Stderr)
 			} else if execReturn.Stdout == "" {
-				log.Println("Container name not found. Maybe creation failed?")
+				log.G(Ctx).Error("Container name not found. Maybe creation failed?")
 			} else {
-				log.Println("Successfully retrieved " + container.Name + " ID: " + execReturn.Stdout)
+				log.G(Ctx).Debug("-- Retrieved " + container.Name + " ID: " + execReturn.Stdout)
 			}
 		}
 	}
@@ -133,11 +139,11 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Docker Sidecar: received Delete call")
+	log.G(Ctx).Info("Docker Sidecar: received Delete call")
 	var execReturn exec.ExecResult
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.G(Ctx).Error(err)
 	}
 
 	var req commonIL.Request
@@ -145,7 +151,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, pod := range req.Pods {
 		for _, container := range pod.Spec.Containers {
-			log.Println("Deleting container " + container.Name)
+			log.G(Ctx).Debug("- Deleting container " + container.Name)
 			cmd := []string{"stop", container.Name}
 			shell := exec.ExecTask{
 				Command: "docker",
@@ -155,7 +161,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn, _ = shell.Execute()
 
 			if execReturn.Stderr != "" {
-				log.Println("Error stopping container " + container.Name + ". Skipping its removing")
+				log.G(Ctx).Error("-- Error stopping container " + container.Name + ". Skipping its removing")
 				continue
 			}
 
@@ -169,7 +175,9 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
 			if execReturn.Stderr != "" {
-				log.Println("Error deleting container " + container.Name)
+				log.G(Ctx).Error("-- Error deleting container " + container.Name)
+			} else {
+				log.G(Ctx).Info("- Deleted container " + container.Name)
 			}
 		}
 	}
@@ -182,57 +190,67 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SetKubeCFGHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Docker Sidecar: received SetKubeCFG call")
+	log.G(Ctx).Info("Docker Sidecar: received SetKubeCFG call")
 	path := "/tmp/.kube/"
 	retCode := "200"
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.G(Ctx).Error(err)
 	}
 
 	var req commonIL.GenericRequestType
 	json.Unmarshal(bodyBytes, &req)
 
-	log.Println("Creating folder to save KubeConfig")
+	log.G(Ctx).Debug("- Creating folder to save KubeConfig")
 	err = os.MkdirAll(path, os.ModePerm)
 	if err != nil {
-		log.Println(err)
+		log.G(Ctx).Error(err)
 		retCode = "500"
 		w.Write([]byte(retCode))
 		return
 	} else {
-		log.Println("Successfully created folder")
+		log.G(Ctx).Debug("-- Created folder")
 	}
-	log.Println("Creating the actual KubeConfig file")
+	log.G(Ctx).Debug("- Creating the actual KubeConfig file")
 	config, err := os.Create(path + "config")
 	if err != nil {
-		log.Println(err)
+		log.G(Ctx).Error(err)
 		retCode = "500"
 		w.Write([]byte(retCode))
 		return
 	} else {
-		log.Println("Successfully created file")
+		log.G(Ctx).Debug("-- Created file")
 	}
-	log.Println("Writing configuration to file")
+	log.G(Ctx).Debug("- Writing configuration to file")
 	_, err = config.Write([]byte(req.Body))
 	if err != nil {
-		log.Println(err)
+		log.G(Ctx).Error(err)
 		retCode = "500"
 		w.Write([]byte(retCode))
 		return
 	} else {
-		log.Println("Successfully written configuration")
+		log.G(Ctx).Info("-- Written configuration")
 	}
 	defer config.Close()
-	log.Println("Setting KUBECONFIG env")
+	log.G(Ctx).Debug("- Setting KUBECONFIG env")
 	err = os.Setenv("KUBECONFIG", path+"config")
 	if err != nil {
-		log.Println(err)
+		log.G(Ctx).Error(err)
 		retCode = "500"
 		w.Write([]byte(retCode))
 		return
 	} else {
-		log.Println("Successfully set KUBECONFIG to " + path + "config")
+		log.G(Ctx).Info("-- Set KUBECONFIG to " + path + "config")
+	}
+
+	kubeconfig, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+	if err != nil {
+		log.G(Ctx).Error("Unable to create a valid config")
+		return
+	}
+	Clientset, err = kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		log.G(Ctx).Fatalln("Unable to set up a clientset")
 	}
 
 	w.Write([]byte(retCode))
