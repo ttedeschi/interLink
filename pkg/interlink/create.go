@@ -2,12 +2,14 @@ package interlink
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	v1 "k8s.io/api/core/v1"
 )
 
 func CreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +19,32 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
-	var req *http.Request
+	var req *http.Request //request to forward to sidecar
+	var req2 []*v1.Pod    //request for interlink
+	json.Unmarshal(bodyBytes, &req2)
+
+	var retrieved_data []commonIL.RetrievedPodData
+	for _, pod := range req2 {
+		data := []commonIL.RetrievedPodData{}
+		if commonIL.InterLinkConfigInst.ExportPodData {
+			data, err = getData(pod)
+			if err != nil {
+				w.Write([]byte("500"))
+				return
+			}
+			log.Print(data)
+		}
+
+		if data == nil {
+			data = append(data, commonIL.RetrievedPodData{Pod: *pod})
+		}
+
+		retrieved_data = append(retrieved_data, data...)
+	}
+
+	bodyBytes, err = json.Marshal(retrieved_data)
+	fmt.Println(retrieved_data)
+	fmt.Println(string(bodyBytes))
 	reader := bytes.NewReader(bodyBytes)
 
 	switch commonIL.InterLinkConfigInst.Sidecarservice {

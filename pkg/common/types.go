@@ -10,26 +10,30 @@ const (
 	UNKNOWN = 2
 )
 
-type PodName struct {
-	Name string `json:"podname"`
-}
-
 type PodStatus struct {
-	PodStatus uint `json:"podStatus"`
+	PodName   string `json:"podname"`
+	PodStatus uint   `json:"podStatus"`
 }
 
 type StatusResponse struct {
-	PodName   []PodName   `json:"podname"`
 	PodStatus []PodStatus `json:"podstatus"`
 	ReturnVal string      `json:"returnVal"`
 }
 
-type Request struct {
-	Pods map[string]*v1.Pod `json:"pods"`
-}
-
 type GenericRequestType struct {
 	Body string `json:"body"`
+}
+
+type RetrievedContainer struct {
+	Name       string         `json:"name"`
+	ConfigMaps []v1.ConfigMap `json:"configMaps"`
+	Secrets    []v1.Secret    `json:"secrets"`
+	EmptyDirs  []string       `json:"emptyDirs"`
+}
+
+type RetrievedPodData struct {
+	Pod        v1.Pod               `json:"pod"`
+	Containers []RetrievedContainer `json:"container"`
 }
 
 type InterLinkConfig struct {
