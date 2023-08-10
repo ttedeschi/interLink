@@ -53,7 +53,10 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "slurm":
 		req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/submit", reader)
-
+		
+	case "htcondor":
+		req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/submit", reader)
+	
 	default:
 		break
 	}
