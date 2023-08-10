@@ -72,8 +72,11 @@ func NewInterLinkConfig() {
 			case "slurm":
 				InterLinkConfigInst.Sidecarport = "4001"
 
+			case "htcondor":
+				InterLinkConfigInst.Sidecarport = "8000"
+
 			default:
-				fmt.Println("Define in InterLinkConfig.yaml one service between docker and slurm")
+				fmt.Println("Define in InterLinkConfig.yaml one service between docker, htcondor and slurm")
 				os.Exit(-1)
 			}
 		}
