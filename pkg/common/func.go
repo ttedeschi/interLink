@@ -51,13 +51,13 @@ func NewInterLinkConfig() {
 		}
 
 		if os.Getenv("SIDECARSERVICE") != "" {
-			if os.Getenv("SIDECARSERVICE") != "docker" && os.Getenv("SIDECARSERVICE") != "slurm" {
-				fmt.Println("export SIDECARSERVICE as docker or slurm")
+			if os.Getenv("SIDECARSERVICE") != "docker" && os.Getenv("SIDECARSERVICE") != "slurm" &&  os.Getenv("SIDECARSERVICE") != "htcondor" {                               
+				fmt.Println("export SIDECARSERVICE as docker or slurm or htcondor")
 				os.Exit(-1)
 			}
 			InterLinkConfigInst.Sidecarservice = os.Getenv("SIDECARSERVICE")
-		} else if InterLinkConfigInst.Sidecarservice != "docker" && InterLinkConfigInst.Sidecarservice != "slurm" {
-			fmt.Println("Set \"docker\" or \"slurm\" in config file or export SIDECARSERVICE as ENV")
+		} else if InterLinkConfigInst.Sidecarservice != "docker" && InterLinkConfigInst.Sidecarservice != "slurm" && InterLinkConfigInst.Sidecarservice != "htcondor" {
+			fmt.Println("Set \"docker\", \"htcondor\" or \"slurm\" in config file or export SIDECARSERVICE as ENV")
 			os.Exit(-1)
 		}
 
