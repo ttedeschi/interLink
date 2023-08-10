@@ -27,6 +27,8 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	case "slurm":
 		req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/stop", reader)
 
+	case "htcondor":
+		req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/stop", reader)
 	default:
 		break
 	}
