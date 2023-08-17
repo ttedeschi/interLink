@@ -18,15 +18,27 @@ var JID []JidStruct
 
 func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Slurm Sidecar: received Submit call")
-	//var resp commonIL.StatusResponse
-
+	statusCode := http.StatusOK
+  
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while creating container. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error(err)
 	}
 
 	var req []commonIL.RetrievedPodData
-	json.Unmarshal(bodyBytes, &req)
+  
+	err = json.Unmarshal(bodyBytes, &req)
+	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while creating container. Check Slurm Sidecar's logs"))
+		log.G(Ctx).Error(err)
+		return
+	}
+
 
 	for _, data := range req {
 		var metadata metav1.ObjectMeta
@@ -41,7 +53,15 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 
 			envs := prepare_envs(container)
 			image := ""
-			mounts := prepare_mounts(container, &data.Pod, req)
+			mounts, err := prepare_mounts(container, req)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error prepairing mounts. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
+			}
+
 			if strings.HasPrefix(container.Image, "/") {
 				if image_uri, ok := metadata.Annotations["slurm-job.knoc.io/image-root"]; ok {
 					image = image_uri + container.Image
@@ -60,13 +80,38 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			singularity_command = append(singularity_command, container.Command...)
 			singularity_command = append(singularity_command, container.Args...)
 
-			path := produce_slurm_script(container, metadata, singularity_command)
-			/*out := */ slurm_batch_submit(path)
-			//handle_jid(container, out, data.Pod)
+			path, err := produce_slurm_script(container, metadata, singularity_command)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error producing Slurm script. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
+			}
+			out, err := slurm_batch_submit(path)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error submitting Slurm script. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
+			}
+			err = handle_jid(container, out, data.Pod)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error handling JID. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
+			}
 
 			jid, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + container.Name + ".jid")
 			if err != nil {
-				log.G(Ctx).Error("Unable to read JID from file")
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Some errors occurred while creating container. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
 			}
 			JID = append(JID, JidStruct{JID: string(jid), Pod: data.Pod})
 		}
@@ -77,9 +122,13 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 
 func StopHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Slurm Sidecar: received Stop call")
+	statusCode := http.StatusOK
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while deleting container. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}
@@ -87,6 +136,9 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 	var req []*v1.Pod
 	err = json.Unmarshal(bodyBytes, &req)
 	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while deleting container. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}
@@ -95,24 +147,38 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 		containers := pod.Spec.Containers
 
 		for _, container := range containers {
-			delete_container(container)
+			err = delete_container(container)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error deleting containers. Check Slurm Sidecar's logs"))
+				log.G(Ctx).Error(err)
+				return
+			}
 		}
 	}
 }
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
+	var req []*v1.Pod
+	var resp []commonIL.PodStatus
+	statusCode := http.StatusOK
 	log.G(Ctx).Info("Slurm Sidecar: received GetStatus call")
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}
 
-	var req []*v1.Pod
-	var resp commonIL.StatusResponse
 	json.Unmarshal(bodyBytes, &req)
 	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}
@@ -123,11 +189,15 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		Args:    cmd,
 		Shell:   true,
 	}
-	execReturn, err := shell.Execute()
+	execReturn, _ := shell.Execute()
 	execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
 	if execReturn.Stderr != "" {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Error executing Squeue. Check Slurm Sidecar's logs"))
 		log.G(Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
+		return
 	}
 
 	for _, pod := range req {
@@ -143,7 +213,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn, _ := shell.Execute()
 
 			if execReturn.Stderr != "" {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Error executing Squeue. Check Slurm Sidecar's logs"))
 				log.G(Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
+				return
 			} else if execReturn.Stdout != "" {
 				flag = true
 				log.G(Ctx).Info(execReturn.Stdout)
@@ -151,14 +225,22 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if flag {
-			resp.PodStatus = append(resp.PodStatus, commonIL.PodStatus{PodName: string(pod.Name), PodStatus: commonIL.RUNNING})
+			resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.RUNNING})
 		} else {
-			resp.PodStatus = append(resp.PodStatus, commonIL.PodStatus{PodName: string(pod.Name), PodStatus: commonIL.STOP})
+			resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.STOP})
 		}
 	}
-	resp.ReturnVal = "Status"
 
-	bodyBytes, _ = json.Marshal(resp)
+	bodyBytes, err = json.Marshal(resp)
+	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
+		log.G(Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
+		log.G(Ctx).Error(err)
+		return
+	}
 
+	w.WriteHeader(statusCode)
 	w.Write(bodyBytes)
 }
