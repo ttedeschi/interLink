@@ -100,6 +100,12 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 				switch mount := data.(type) {
 				case v1.ConfigMap:
 					var configMapNamePaths []string
+					err := os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID) + "/" + "configMaps/" + vol.Name)
+
+					if err != nil {
+						log.G(Ctx).Error("Unable to delete root folder")
+						return nil, err
+					}
 					if podVolumeSpec != nil && podVolumeSpec.ConfigMap != nil {
 						podConfigMapDir := filepath.Join(wd+"/"+commonIL.InterLinkConfigInst.DataRootFolder, pod.Namespace+"-"+string(pod.UID)+"/", "configMaps/", vol.Name)
 						mode := os.FileMode(*podVolumeSpec.ConfigMap.DefaultMode)
@@ -127,6 +133,7 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 							log.G(Ctx).Debug("-- Created directory " + podConfigMapDir)
 						}
 
+
 						log.G(Ctx).Info("-- Writing ConfigMaps files")
 						for k, v := range mount.Data {
 							// TODO: Ensure that these files are deleted in failure cases
@@ -145,10 +152,10 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 						}
 						return configMapNamePaths, nil
 					}
-
+          
 				case v1.Secret:
 					var secretNamePaths []string
-					err := delete_root("secrets")
+					err := os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID) + "/" + "secrets/" + vol.Name)
 
 					if err != nil {
 						log.G(Ctx).Error("Unable to delete root folder")
@@ -233,16 +240,5 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 		}
 	}
 	return nil, err
-}
 
-func delete_root(path string) error {
-	cmd := []string{"-rf " + commonIL.InterLinkConfigInst.DataRootFolder + path}
-	shell := exec2.ExecTask{
-		Command: "rm",
-		Args:    cmd,
-		Shell:   true,
-}
-
-	_, err := shell.Execute()
-	return err
 }
