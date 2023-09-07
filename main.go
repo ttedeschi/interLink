@@ -25,7 +25,7 @@ import (
 	"path"
 	"time"
 
-	//"k8s.io/client-go/rest"
+	// "k8s.io/client-go/rest"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	//"net/http"
+	// "net/http"
 
 	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 	"github.com/sirupsen/logrus"
@@ -183,8 +183,8 @@ func main() {
 		}
 		return nil
 	}()
-	//<-nc.Ready()
-	//close(nc)
+	// <-nc.Ready()
+	// close(nc)
 
 	eb := record.NewBroadcaster()
 
