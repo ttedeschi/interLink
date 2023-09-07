@@ -142,8 +142,6 @@ func main() {
 		}
 	}
 
-	log.G(ctx).Debug(kubecfg)
-
 	localClient := kubernetes.NewForConfigOrDie(kubecfg)
 
 	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx)
