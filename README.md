@@ -234,7 +234,11 @@ The received JSON is unmarshaled into an array of RetrievedPodData (described in
   After the script is being generated without errors, it is executed using `sbatch *pathToSriptFile*` and the job ID is saved to a file to eventually abort it later. At this point, SLURM will take care of the job itself.
   If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.
 - Delete call:
-The received JSON is unmarshaled into an array of v1.Pod.
+The received JSON is unmarshaled into an array of v1.Pod. For each Container in each Pod, `scancel *jobID*` is executed and all related files are deleted.
+If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.
+- Status call:
+The received JSON is unmarshaled into an array of v1.Pod. For each Container in each Pod, `squeue --me | grep *jobID*` is executed and if the output is not nil, the return value for the checked Container is set to running, otherwise to not running.
+If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.
 
 ## GitHub repository management rules
 
