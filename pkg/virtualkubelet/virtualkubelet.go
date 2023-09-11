@@ -156,7 +156,7 @@ func loadConfig(providerConfig, nodeName string, ctx context.Context) (config Vi
 
 	commonIL.NewInterLinkConfig()
 	mutex := http.NewServeMux()
-	mutex.HandleFunc("/sendCFG", commonIL.SendCFG)
+	mutex.HandleFunc("/getCFG", commonIL.SendCFG)
 	go func() {
 
 		err = http.ListenAndServe(":"+commonIL.InterLinkConfigInst.VKport, mutex)

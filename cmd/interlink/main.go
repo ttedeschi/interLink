@@ -38,7 +38,7 @@ func main() {
 		for {
 			var returnValue, _ = json.Marshal("Error")
 			reader := bytes.NewReader(nil)
-			req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.VKurl+":"+commonIL.InterLinkConfigInst.VKport+"/sendCFG", reader)
+			req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.VKurl+":"+commonIL.InterLinkConfigInst.VKport+"/getCFG", reader)
 
 			if err != nil {
 				log.G(context.Background()).Error(err)

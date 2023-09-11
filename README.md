@@ -176,18 +176,22 @@ Another way to remove a running Pod is by manually executing a `kubectl delete p
 Every HTTP call is performed as a REST standard call, specifing the interlink path, the interlink port and a fixed path, according to the call; for example  `http://localhost:3000/create` is a create call on a InterLink being run on the same VK machine on the port 3000. InterLink path and port can be specified in the InterLinkConfig.yaml file. The body of every call is the same: a marshalled (JSON type) list of Pod descriptors, which are stored in variables of type v1.Pod, a built-in go-client standard Kubernetes type.  
 
 A quick recap to the list of outgoing HTTP calls:
-| Call          | URL                                   |
-|---------------| :------------------------------------:|
-| SetKubeConfig | InterLinkUrl:InterLinkPort/setKubeCFG |
-| Create        |   InterLinkUrl:InterLinkPort/create   |
-| Delete        |   InterLinkUrl:InterLinkPort/delete   |
-| Status        |   InterLinkUrl:InterLinkPort/status   |
+| Call          |     Incoming URL     |               Outgoing URL              |
+|---------------| :------------------: |:---------------------------------------:|
+| GetCFG        | VKUrl:VKPort/getCFG  |                                         |
+| SetKubeConfig |                      |   InterLinkUrl:InterLinkPort/setKubeCFG |
+| Create        |                      |    InterLinkUrl:InterLinkPort/create    |
+| Delete        |                      |    InterLinkUrl:InterLinkPort/delete    |
+| Status        |                      |    InterLinkUrl:InterLinkPort/status    |
 
 ### InterLink
 InterLink is the middleware in charge to translate Virtual Kubelet's HTTP calls in a standard, agnostic outputs understandable to whatever plugin, called in this context Sidecar, below him. To properly work, a working Kubeconfig must be provided by the Virtual Kubelet.  
 Upon the receiving of a call, InterLink usually forwards that call to the sidecar (at least for now), handling any received error, except for the Create call and the SetKubeConfig call, so let's dig it in a bit:
+- GetCFG call:
+It is the first call performed by the InterLink API at its startup. It is used to query the Virtual Kubelet for a working Service Account.
+
 - SetKubeConfig call:  
-This is the first call sent by the Virtual Kubelet; VK performs some operations in its local machine, in order to retrieve a ServiceAccount. After receiving the configuration over the HTTP request body, it is stored inside /tmp/.kube/config and then the environment variable KUBECONFIG is set to that path, to allow InterLink to access the right Kubernetes cluster. From now, InterLink will look at the same K8S cluster used by the Virtual Kubelet. If any error(s) occur, InterLink panics (since it cannot operate without a working kubeconfig) and the error is forwarded to the VK.  
+This is the call sent by the Virtual Kubelet after te VK has received a GetCFG call; VK performs some operations in its local machine, in order to retrieve a ServiceAccount. After receiving the configuration over the HTTP request body, it is stored inside /tmp/.kube/config and then the environment variable KUBECONFIG is set to that path, to allow InterLink to access the right Kubernetes cluster. From now, InterLink will look at the same K8S cluster used by the Virtual Kubelet. If any error(s) occur, InterLink panics (since it cannot operate without a working kubeconfig) and the error is forwarded to the VK.  
 
 - Create call:  
 That's the most complex call, for the moment. Everytime a Pod is registered to the Kubernetes cluster, the VK sends a Create Call to InterLink. In this phase, InterLink can retrieve all ConfigMaps, Secrets and EmpyDirs data (if the ExportPodData is set to true in the InterLinkConfig.yaml file); retrieving data means scanning every Container in every single submitted Pod, looking for Secrets, ConfigMaps and, eventually, EmptyDirs. Once they have been found, the cluster is again queried, using those names, to retrieve their values. All of these values are then assembled together is a single struct of type RetrievedPodData; this struct contains the standard v1.Pod (defined by Kubernetes go-client standard library) and an array of custom sub-struct containing a Container name and every Secret/ConfigMap/EmptyDir related to that specific Container. The parent struct is then marshalled into a JSON and sent over the HTTP request body to the Sidecar.  
@@ -199,6 +203,7 @@ A quick recap to the list of HTTP calls:
 
 | Call          |             Incoming URL              |          Outgoing URL         |
 |---------------| :-----------------------------------: |:-----------------------------:|
+|     GetCFG    |                                       |     VKUrl:VKPort/getCFG       |
 | SetKubeConfig | InterLinkUrl:InterLinkPort/setKubeCFG |                               |
 | Create        |   InterLinkUrl:InterLinkPort/create   | SidecarURL:SidecarPort/create |
 | Delete        |   InterLinkUrl:InterLinkPort/delete   | SidecarURL:SidecarPort/delete |
