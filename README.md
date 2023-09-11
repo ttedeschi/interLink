@@ -121,8 +121,10 @@ __You can find instructions on how to get started with installation script (itwi
 Detailed explanation of the InterLink config file key values.
 | Key         | Value     |
 |--------------|-----------|
+| VKURL | the URL to allow InterLink to contact the VK. It is used only when a new InterLink instance is started, to allow InterLink to query the VK for a working KubeConfig.
 | InterlinkURL | the URL to allow the Virtual Kubelet to contact the InterLink module. |
 | SidecarURL | the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here |
+| VKPort | the VK listening port. It is used only when a new InterLink instance is started, to allow InterLink to query the VK for a working KubeConfig.
 | InterlinkPort | the Interlink listening port. InterLink and VK will communicate over this port. |
 | SidecarPort | the sidecar listening port. Sidecar and Interlink will communicate on this port. Set $SIDECARPORT environment variable to specify a custom one |
 | SbatchPath | path to your Slurm's sbatch binary |

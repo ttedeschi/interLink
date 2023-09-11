@@ -44,10 +44,12 @@ type ConfigMapSecret struct {
 
 type InterLinkConfig struct {
 	VKTokenFile    string `yaml:"VKTokenFile"`
+	VKurl          string `yaml:"VKURL"`
 	Interlinkurl   string `yaml:"InterlinkURL"`
 	Sidecarurl     string `yaml:"SidecarURL"`
 	Sbatchpath     string `yaml:"SbatchPath"`
 	Scancelpath    string `yaml:"ScancelPath"`
+	VKport         string `yaml:"VKPort"`
 	Interlinkport  string `yaml:"InterlinkPort"`
 	Sidecarport    string `yaml:"SidecarPort"`
 	Commandprefix  string `yaml:"CommandPrefix"`
