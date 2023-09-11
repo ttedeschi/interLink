@@ -2,7 +2,7 @@
 
 ## :information_source: Overview
 
-InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a container execution lifecycle.
+InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.
 
 __Goals__:
 - TBD
@@ -13,7 +13,7 @@ __Non-goals__:
 The project consists of two main components:
 
 - __A Kubernetes Virtual Node:__ based on the [VirtualKubelet](https://virtual-kubelet.io/) technology. Translating request for a kubernetes pod execution into a remote call to the interLink API server.
-- __The interLink API server:__ a modular and pluggable REST server where you can create your own container manager plugin (called sidecars), or use the existing ones: remote docker execution on a remote host, singularity container on a remote SLURM batch system.
+- __The interLink API server:__ a modular and pluggable REST server where you can create your own Container manager plugin (called sidecars), or use the existing ones: remote docker execution on a remote host, singularity Container on a remote SLURM batch system.
 
 The project is reusing and get inspired by the [KNoC](https://github.com/CARV-ICS-FORTH/knoc) boilerplates at different levels, implementing the generic API layer in place of an ssh execution as the original contribution.
 
@@ -93,16 +93,16 @@ In `./kustomizations` you can then play with the different configuration and dep
     ```bash
     kubectl apply -f examples/busyecho_k8s.yaml -n vk
     ```
-You will see now a container starting up on your host, but managed by the docker compose interlink daemons.
+You will see now a Container starting up on your host, but managed by the docker compose interlink daemons.
 
 ### :wrench: Kustomizing your Virtual Kubelet
 
 To customize your virtual node deployment edit the configuration files within the kustomizations directory:
 - `kustomization.yaml`: here you can specify resource files and generate configMaps
 - `deployment.yaml`: that's the main file you want to edit. Nested into spec -> template -> spec -> containers you can find these fields:
-    - name: the container name
+    - name: the Container name
     - image: Here you can specify which image to use, if you need another one. 
-    - args: These are the arguments passed to the VK binary running inside the container.
+    - args: These are the arguments passed to the VK binary running inside the Container.
     - env: Environment Variables used by kubelet and by the VK itself. Check the ENVS list for a detailed explanation on how to set them.
 - `knoc-cfg.json`: it's the config file for the VK itself. Here you can specify how many resources to allocate for the VK. Note that the name specified here for the VK must match the name given in the others config files.
 - `InterLinkConfig.yaml`: configuration file for the inbound/outbound communication (and not only) to/from the InterLink module. For a detailed explanation of all fields, check the [InterLink Config File](#information_source-interlink-config-file) section.
@@ -129,7 +129,7 @@ Detailed explanation of the InterLink config file key values.
 | ScancelPath | path to your Slurm's scancel binary | 
 | VKTokenFile | path to a file containing your token fot OAuth2 proxy authentication. |
 | CommandPrefix | here you can specify a prefix for the programmatically generated script (for the slurm plugin). Basically, if you want to run anything before the script itself, put it here. |
-| ExportPodData | Set it to true if you want to export Pod's ConfigMaps and Secrets as mountpoints in your Singularity container |
+| ExportPodData | Set it to true if you want to export Pod's ConfigMaps and Secrets as mountpoints in your Singularity Container |
 | DataRootFolder | Specify where to store the exported ConfigMaps/Secrets locally |
 | ServiceAccount | The Service Account name to generate a limited KubeConfig to be passed to your Sidecars |
 | Namespace | Namespace where Pods in your K8S will be registered |
@@ -188,7 +188,7 @@ Upon the receiving of a call, InterLink usually forwards that call to the sideca
 This is the first call sent by the Virtual Kubelet; VK performs some operations in its local machine, in order to retrieve a ServiceAccount. After receiving the configuration over the HTTP request body, it is stored inside /tmp/.kube/config and then the environment variable KUBECONFIG is set to that path, to allow InterLink to access the right Kubernetes cluster. From now, InterLink will look at the same K8S cluster used by the Virtual Kubelet. If any error(s) occur, InterLink panics (since it cannot operate without a working kubeconfig) and the error is forwarded to the VK.  
 
 - Create call:  
-That's the most complex call, for the moment. Everytime a Pod is registered to the Kubernetes cluster, the VK sends a Create Call to InterLink. In this phase, InterLink can retrieve all ConfigMaps, Secrets and EmpyDirs data (if the ExportPodData is set to true in the InterLinkConfig.yaml file); retrieving data means scanning every container in every single submitted Pod, looking for Secrets, ConfigMaps and, eventually, EmptyDirs. Once they have been found, the cluster is again queried, using those names, to retrieve their values. All of these values are then assembled together is a single struct of type RetrievedPodData; this struct contains the standard v1.Pod (defined by Kubernetes go-client standard library) and an array of custom sub-struct containing a container name and every Secret/ConfigMap/EmptyDir related to that specific container. The parent struct is then marshalled into a JSON and sent over the HTTP request body to the Sidecar.  
+That's the most complex call, for the moment. Everytime a Pod is registered to the Kubernetes cluster, the VK sends a Create Call to InterLink. In this phase, InterLink can retrieve all ConfigMaps, Secrets and EmpyDirs data (if the ExportPodData is set to true in the InterLinkConfig.yaml file); retrieving data means scanning every Container in every single submitted Pod, looking for Secrets, ConfigMaps and, eventually, EmptyDirs. Once they have been found, the cluster is again queried, using those names, to retrieve their values. All of these values are then assembled together is a single struct of type RetrievedPodData; this struct contains the standard v1.Pod (defined by Kubernetes go-client standard library) and an array of custom sub-struct containing a Container name and every Secret/ConfigMap/EmptyDir related to that specific Container. The parent struct is then marshalled into a JSON and sent over the HTTP request body to the Sidecar.  
 
 - Status/Delete call:  
 The received body is just forwarded to the Sidecar and any error is then handled and forwarded to the VK.
@@ -204,17 +204,37 @@ A quick recap to the list of HTTP calls:
 
 ### Sidecars
 Sidecars are modular plugins able to talk to InterLink API and, so, to the Kubernetes cluster. They performs specific operations based on what the actual plugin is, but the idea behind them is to submit a Pod on the cluster and, according to annotations, mountpoints, secrets, etc, deploy specific services.
-Let's take the Docker Sidecar from the quick start tutorial for example. Submitting a Pod to the cluster means the Sidecar will receive from InterLink the list of all related Secrets, ConfigMaps, EmptyDirs and the description of the Pod itself. Using these informations, the Docker plugin will be able to run a specific container in the Docker environment, managing volume mounts and choosing the appropriate image for the container; the Slurm Sidecar will instead generate a script to be run in the Slurm HPC environment: starting from the same Pod, we will have different behaviours according to the running Sidecar, but requests and aknlowdgements from/to the InterLink API will be standard. Each Sidecar accepts the three standard outgoing calls we described in the InterLink API.
+Let's take the Docker Sidecar from the quick start tutorial for example. Submitting a Pod to the cluster means the Sidecar will receive from InterLink the list of all related Secrets, ConfigMaps, EmptyDirs and the description of the Pod itself. Using these informations, the Docker plugin will be able to run a specific Container in the Docker environment, managing volume mounts and choosing the appropriate image for the Container; the Slurm Sidecar will instead generate a script to be run in the Slurm HPC environment: starting from the same Pod, we will have different behaviours according to the running Sidecar, but requests and aknlowdgements from/to the InterLink API will be standard. Each Sidecar accepts the three standard outgoing calls we described in the InterLink API.
 
 #### Docker Sidecar
 Despite the InterLink API, there is no outgoing call here, since it's the final endpoint of the chain (like every Sidecar). Let's see every operation performed upon the receving of each call:  
 - Create call:  
-The received JSON is unmarshaled into an array of RetrievedPodData (described in the types.go of the common package). At this point, iterating over the array allows us to run a `docker run *arguments*` command for each received container, handling mountpoints for Secrets, ConfigMaps and EmptyDirs, if the appropriate flag is set in the config file.  
+The received JSON is unmarshaled into an array of RetrievedPodData (described in the types.go of the common package). At this point, iterating over the array allows us to run a `docker run *arguments*` command for each received Container, handling mountpoints for Secrets, ConfigMaps and EmptyDirs, if the appropriate flag is set in the config file.  
 The majority of the function aims to define a string to automatically replace the `*arguments*` in the previous statement.
-Handling mountpoints actually means creating files and directories reflecting Secrets/ConfigMaps structures; for example, a ConfigMap named "myconfigmap" and having a key named "key1" of value "value1" will generate directories, within a parent directory having the PodID denomination, in the form of ConfigMaps/myconfigmap with a file called "key1" containing the string "value1". Same applies to Secrets and EmptyDirs. Later, using a bind mount, these files will be proper mounted in the container.  
+Handling mountpoints actually means creating files and directories reflecting Secrets/ConfigMaps structures; for example, a ConfigMap named "myconfigmap" and having a key named "key1" of value "value1" will generate directories, within a parent directory having the PodID denomination, in the form of ConfigMaps/myconfigmap with a file called "key1" containing the string "value1". Same applies to Secrets and EmptyDirs. Later, using a bind mount, these files will be proper mounted in the Container.  
 After mountpoints, commands and relative arguments are also appended to the docker run string.  
-Finally, the docker run command is executed and the container is started.
+Finally, the docker run command is executed and the Container is started.  
+If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.  
+- Delete call:
+The received JSON is unmarshaled into an array of v1.Pod. Iterating over the array, the Sidecar runs a `docker stop *containerName*`, followed by a `docker rm *containername*`. using rm -f is avoided to allow a proper termination of the Container, catching any error.  
+If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.  
+- Status call:
+The received JSON is unmarshaled into an array of v1.Pod. Iterating over the array, the Sidecar runs a `docker ps -aqf name=*containerName*`; if nothing is returned, it means the provided Container is not running or is not existing at all. A code is then return, specifying the status of each Container.
 If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.
+
+#### Slurm Sidecar
+As Docker Sidecar, there is no outgoing call, being the final endpoint too. About the calls:
+- Create call:
+The received JSON is unmarshaled into an array of RetrievedPodData (described in the types.go of the common package). A Sbatch script for every Container in each Pod is then created, according to the following:
+    - Environment Variables are retrieved from the substruct of type v1.Container and appended to a string using the prefix `--env`
+    - Mountpoints are handled in a similar way to Docker Sidecar, but specifying a different parameter name to be appended; also, differently to Docker, which can only share the same filesystem of the host machine, Slurm Sidecar stores by default ConfigMaps/Secrets/EmptyDirs values in ENVS later exported by the Sbatch script itself. At runtime, the script creates the related files, copies the ENVS content inside and finally mounts them, as Docker would. This happens because the Worker Node is usually not the same machine as the one used to submit the job and it is not possible to ensure the filesystem to be the same. Since this is a relatively complex operation, error handling is needed and if it errors out, the operation is aborted.
+    - ENVS, Mountpoints, Container image, Commands to be executed at runtime and their related arguments are then chained together into a single string and this string is then passed to a function in charge of generating the actual file containing the script.
+    - If Tsocks is set to true in the InterLinkConfig file, a TSOCK proxy configuration is added to the script, allowing communication outside the Worker Node
+    - The content is finally written to a file called `*containerName*`
+  After the script is being generated without errors, it is executed using `sbatch *pathToSriptFile*` and the job ID is saved to a file to eventually abort it later. At this point, SLURM will take care of the job itself.
+  If an error occurs, the procedure is aborted and the error is returned to the InterLink API, which will return an error to the VK.
+- Delete call:
+The received JSON is unmarshaled into an array of v1.Pod.
 
 ## GitHub repository management rules
 
