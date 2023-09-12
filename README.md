@@ -121,10 +121,8 @@ __You can find instructions on how to get started with installation script (itwi
 Detailed explanation of the InterLink config file key values.
 | Key         | Value     |
 |--------------|-----------|
-| VKURL | the URL to allow InterLink to contact the VK. It is used only when a new InterLink instance is started, to allow InterLink to query the VK for a working KubeConfig.
 | InterlinkURL | the URL to allow the Virtual Kubelet to contact the InterLink module. |
 | SidecarURL | the URL to allow InterLink to communicate with the Sidecar module (docker, slurm, etc). Do not specify port here |
-| VKPort | the VK listening port. It is used only when a new InterLink instance is started, to allow InterLink to query the VK for a working KubeConfig.
 | InterlinkPort | the Interlink listening port. InterLink and VK will communicate over this port. |
 | SidecarPort | the sidecar listening port. Sidecar and Interlink will communicate on this port. Set $SIDECARPORT environment variable to specify a custom one |
 | SbatchPath | path to your Slurm's sbatch binary |
@@ -168,7 +166,7 @@ But what actually happens inside every component?
 
 ### Virtual Kubelet
 The Virtual Kubelet is of course based on the latest Virtual Kubelet release, provided by Kubernetes itself. Being actually a Kubelet, every Pod submitted to the cluster is then registered to the Kubelet if taints and selectors actually match.  
-The first thing done by the Virtual Kubelet is attempting a communication with the InterLink API to send a ServiceAccount configuration, which will then be used by the InterLink API to retrieve from the cluster everything is needed by Sidecars; this ServiceAccount has restricted permissions and can ONLY READ and retrieve informations from the registered Pods: no edit/creation/deletion is allowed. The configuration is then stored in a temporary file and sent in the HTTP request body. If some error(s) occurs in this phase, the Virtual Kubelet aborts its execution, since the configuration is crucial to InterLink's proper working.
+The first thing done by the Virtual Kubelet is attempting a communication with the InterLink API to send a ServiceAccount configuration, which will then be used by the InterLink API to retrieve from the cluster everything is needed by Sidecars; this ServiceAccount has restricted permissions and can ONLY READ and retrieve informations from the registered Pods: no edit/creation/deletion is allowed. The configuration is then stored in a temporary file and sent in the HTTP request body. If some error(s) occurs in this phase, the Virtual Kubelet aborts its execution, since the configuration is crucial to InterLink's proper working. Every 10 seconds, a Ping call is sent to InterLink, to check if the connection is still available; if it is not available for some time, when it will be restored, a new Service Account is generated and sent again.
 After that, the VK starts its actual work by managing any basic Pod operation, like adding, removing, quering, etc Pods to/from the cluster.  
 While a Pod is being registered, upon a `kubectl apply -f yaml_file.yaml` command for example, the Kubelet sends a Create HTTP call to the InterLink API.  
 If at least 1 Pod is registered to the Kubelet, every 5 seconds, a Status HTTP call to the InterLink API is automatically issued to check every Pod's health. If a job executed by a Pod is terminated (returning errors or not) or if a service supposed to run is not running anymore, the Pod is being removed from the Kubernetes Cluster by the Kubelet itself.  
@@ -176,19 +174,19 @@ Another way to remove a running Pod is by manually executing a `kubectl delete p
 Every HTTP call is performed as a REST standard call, specifing the interlink path, the interlink port and a fixed path, according to the call; for example  `http://localhost:3000/create` is a create call on a InterLink being run on the same VK machine on the port 3000. InterLink path and port can be specified in the InterLinkConfig.yaml file. The body of every call is the same: a marshalled (JSON type) list of Pod descriptors, which are stored in variables of type v1.Pod, a built-in go-client standard Kubernetes type.  
 
 A quick recap to the list of outgoing HTTP calls:
-| Call          |     Incoming URL     |               Outgoing URL              |
-|---------------| :------------------: |:---------------------------------------:|
-| GetCFG        | VKUrl:VKPort/getCFG  |                                         |
-| SetKubeConfig |                      |   InterLinkUrl:InterLinkPort/setKubeCFG |
-| Create        |                      |    InterLinkUrl:InterLinkPort/create    |
-| Delete        |                      |    InterLinkUrl:InterLinkPort/delete    |
-| Status        |                      |    InterLinkUrl:InterLinkPort/status    |
+| Call          |                   URL                   |
+|---------------|:---------------------------------------:|
+| PingInterLink |      InterLinkUrl:InterLinkPort/ping    |
+| SetKubeConfig |   InterLinkUrl:InterLinkPort/setKubeCFG |
+| Create        |    InterLinkUrl:InterLinkPort/create    |
+| Delete        |    InterLinkUrl:InterLinkPort/delete    |
+| Status        |    InterLinkUrl:InterLinkPort/status    |
 
 ### InterLink
 InterLink is the middleware in charge to translate Virtual Kubelet's HTTP calls in a standard, agnostic outputs understandable to whatever plugin, called in this context Sidecar, below him. To properly work, a working Kubeconfig must be provided by the Virtual Kubelet.  
 Upon the receiving of a call, InterLink usually forwards that call to the sidecar (at least for now), handling any received error, except for the Create call and the SetKubeConfig call, so let's dig it in a bit:
-- GetCFG call:
-It is the first call performed by the InterLink API at its startup. It is used to query the Virtual Kubelet for a working Service Account.
+- Ping call:
+A very simple call which allow the VK to understand if the InterLink API is online and ready to get a Service Account. The only thing done here is answering the caller with a 200 code.
 
 - SetKubeConfig call:  
 This is the call sent by the Virtual Kubelet after te VK has received a GetCFG call; VK performs some operations in its local machine, in order to retrieve a ServiceAccount. After receiving the configuration over the HTTP request body, it is stored inside /tmp/.kube/config and then the environment variable KUBECONFIG is set to that path, to allow InterLink to access the right Kubernetes cluster. From now, InterLink will look at the same K8S cluster used by the Virtual Kubelet. If any error(s) occur, InterLink panics (since it cannot operate without a working kubeconfig) and the error is forwarded to the VK.  

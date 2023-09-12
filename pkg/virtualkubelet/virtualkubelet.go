@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -155,17 +154,6 @@ func NewProvider(providerConfig, nodeName, operatingSystem string, internalIP st
 func loadConfig(providerConfig, nodeName string, ctx context.Context) (config VirtualKubeletConfig, err error) {
 
 	commonIL.NewInterLinkConfig()
-	mutex := http.NewServeMux()
-	mutex.HandleFunc("/getCFG", commonIL.SendCFG)
-	go func() {
-
-		err = http.ListenAndServe(":"+commonIL.InterLinkConfigInst.VKport, mutex)
-
-		if err != nil {
-			log.G(ctx).Fatal(err)
-		}
-	}()
-
 	log.G(context.Background()).Info("Loading Virtual Kubelet config from " + providerConfig)
 	data, err := ioutil.ReadFile(providerConfig)
 	if err != nil {

@@ -216,17 +216,28 @@ func NewServiceAccount() error {
 	return nil
 }
 
-func SendCFG(w http.ResponseWriter, r *http.Request) {
-	statusCode := http.StatusOK
-	err := NewServiceAccount()
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-	}
-	w.WriteHeader(statusCode)
+func PingInterLink() (error, bool) {
+	req, err := http.NewRequest(http.MethodPost, InterLinkConfigInst.Interlinkurl+":"+InterLinkConfigInst.Interlinkport+"/ping", nil)
 
-	if statusCode != http.StatusOK {
-		w.Write([]byte("VK unable to provide a KubeConfig"))
+	if err != nil {
+		log.G(context.Background()).Error(err)
+	}
+
+	token, err := os.ReadFile(InterLinkConfigInst.VKTokenFile) // just pass the file name
+	if err != nil {
+		log.G(context.Background()).Error(err)
+		return err, false
+	}
+	req.Header.Add("Authorization", "Bearer "+string(token))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err, false
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return nil, true
 	} else {
-		w.Write([]byte("Received KubeConfig from VK"))
+		log.G(context.Background()).Error("Error " + err.Error() + " " + fmt.Sprint(resp.StatusCode))
+		return nil, false
 	}
 }
