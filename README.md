@@ -174,7 +174,7 @@ Another way to remove a running Pod is by manually executing a `kubectl delete p
 Every HTTP call is performed as a REST standard call, specifing the interlink path, the interlink port and a fixed path, according to the call; for example  `http://localhost:3000/create` is a create call on a InterLink being run on the same VK machine on the port 3000. InterLink path and port can be specified in the InterLinkConfig.yaml file. The body of every call is the same: a marshalled (JSON type) list of Pod descriptors, which are stored in variables of type v1.Pod, a built-in go-client standard Kubernetes type.  
 
 A quick recap to the list of outgoing HTTP calls:
-| Call          |                   URL                   |
+| Call          |              Outgoing URL               |
 |---------------|:---------------------------------------:|
 | PingInterLink |      InterLinkUrl:InterLinkPort/ping    |
 | SetKubeConfig |   InterLinkUrl:InterLinkPort/setKubeCFG |
@@ -201,7 +201,7 @@ A quick recap to the list of HTTP calls:
 
 | Call          |             Incoming URL              |          Outgoing URL         |
 |---------------| :-----------------------------------: |:-----------------------------:|
-|     GetCFG    |                                       |     VKUrl:VKPort/getCFG       |
+| Ping          |    InterLinkUrl:InterLinkPort/ping    |                               |
 | SetKubeConfig | InterLinkUrl:InterLinkPort/setKubeCFG |                               |
 | Create        |   InterLinkUrl:InterLinkPort/create   | SidecarURL:SidecarPort/create |
 | Delete        |   InterLinkUrl:InterLinkPort/delete   | SidecarURL:SidecarPort/delete |
