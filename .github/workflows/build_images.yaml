@@ -28,7 +28,7 @@ jobs:
         id: get_repo_owner
         run: echo ::set-output name=repo_owner::$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
       - name: Build container base image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: ./
           outputs: "type=registry,push=true"
@@ -60,7 +60,7 @@ jobs:
         id: get_repo_owner
         run: echo ::set-output name=repo_owner::$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
       - name: Build container base image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: ./
           outputs: "type=registry,push=true"
