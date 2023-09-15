@@ -135,15 +135,11 @@ func produce_slurm_script(container v1.Container, metadata metav1.ObjectMeta, co
 	path := "/tmp/" + container.Name + ".sh"
 	postfix := ""
 
-	_, err := os.Stat(path)
-	if err == nil {
-		err = os.Remove(path)
-		if err != nil {
-			log.G(Ctx).Error(err)
-			return "", err
-		}
+	err := os.RemoveAll(path)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return "", err
 	}
-
 	f, err := os.Create(path)
 	if err != nil {
 		log.G(Ctx).Error("Unable to create file " + path)
@@ -367,7 +363,7 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 								err = os.WriteFile(fullPath, []byte(v), mode)
 								if err != nil {
 									log.G(Ctx).Errorf("Could not write ConfigMap file %s", fullPath)
-									os.Remove(fullPath)
+									os.RemoveAll(fullPath)
 									if err != nil {
 										log.G(Ctx).Error("Unable to remove file " + fullPath)
 										return nil, nil, err
@@ -442,7 +438,7 @@ func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, 
 								os.WriteFile(fullPath, v, mode)
 								if err != nil {
 									log.G(Ctx).Errorf("Could not write Secret file %s", fullPath)
-									err = os.Remove(fullPath)
+									err = os.RemoveAll(fullPath)
 									if err != nil {
 										log.G(Ctx).Error("Unable to remove file " + fullPath)
 										return nil, nil, err
