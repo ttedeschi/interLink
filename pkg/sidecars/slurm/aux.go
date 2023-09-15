@@ -135,11 +135,15 @@ func produce_slurm_script(container v1.Container, metadata metav1.ObjectMeta, co
 	path := "/tmp/" + container.Name + ".sh"
 	postfix := ""
 
-	err := os.Remove(path)
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return "", err
+	_, err := os.Stat(path)
+	if err == nil {
+		err = os.Remove(path)
+		if err != nil {
+			log.G(Ctx).Error(err)
+			return "", err
+		}
 	}
+
 	f, err := os.Create(path)
 	if err != nil {
 		log.G(Ctx).Error("Unable to create file " + path)
