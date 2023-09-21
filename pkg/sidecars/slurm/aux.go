@@ -26,6 +26,11 @@ var Ctx context.Context
 var kubecfg *rest.Config
 var JIDs []commonIL.JidStruct
 
+type SingularityCommand struct {
+	containerName string
+	command       []string
+}
+
 func prepare_envs(container v1.Container) []string {
 	log.G(Ctx).Info("-- Appending envs")
 	env := make([]string, 1)
@@ -132,9 +137,9 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 	return append(mount, mount_data), nil
 }
 
-func produce_slurm_script(container v1.Container, podUID string, metadata metav1.ObjectMeta, command []string) (string, error) {
+func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []SingularityCommand) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
-	path := commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".sh"
+	path := commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".sh"
 	postfix := ""
 
 	err := os.RemoveAll(path)
@@ -143,6 +148,8 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 		return "", err
 	}
 	f, err := os.Create(path)
+	defer f.Close()
+
 	if err != nil {
 		log.G(Ctx).Error("Unable to create file " + path)
 		return "", err
@@ -158,7 +165,9 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 	if mpi_flags, ok := metadata.Annotations["slurm-job.knoc.io/mpi-flags"]; ok {
 		if mpi_flags != "true" {
 			mpi := append([]string{"mpiexec", "-np", "$SLURM_NTASKS"}, strings.Split(mpi_flags, " ")...)
-			command = append(mpi, command...)
+			for _, singularityCommand := range commands {
+				singularityCommand.command = append(mpi, singularityCommand.command...)
+			}
 		}
 	}
 	for _, slurm_flag := range sbatch_flags_from_argo {
@@ -182,8 +191,8 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 
 		prefix += "\nssh -4 -N -D $port " + commonIL.InterLinkConfigInst.Tsockslogin + " &"
 		prefix += "\nSSH_PID=$!"
-		prefix += "\necho \"local = 10.0.0.0/255.0.0.0 \nserver = 127.0.0.1 \nserver_port = $port\" >> .tmp/" + podUID + "_" + container.Name + "_tsocks.conf"
-		prefix += "\nexport TSOCKS_CONF_FILE=.tmp/" + podUID + "_" + container.Name + "_tsocks.conf && export LD_PRELOAD=" + commonIL.InterLinkConfigInst.Tsockspath
+		prefix += "\necho \"local = 10.0.0.0/255.0.0.0 \nserver = 127.0.0.1 \nserver_port = $port\" >> .tmp/" + podUID + "_tsocks.conf"
+		prefix += "\nexport TSOCKS_CONF_FILE=.tmp/" + podUID + "_tsocks.conf && export LD_PRELOAD=" + commonIL.InterLinkConfigInst.Tsockspath
 	}
 
 	if commonIL.InterLinkConfigInst.Commandprefix != "" {
@@ -191,7 +200,7 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 	}
 
 	sbatch_macros := "#!" + commonIL.InterLinkConfigInst.BashPath +
-		"\n#SBATCH --job-name=" + podUID + "_" + container.Name +
+		"\n#SBATCH --job-name=" + podUID +
 		sbatch_flags_as_string +
 		"\n. ~/.bash_profile" +
 		//"\nmodule load singularity" +
@@ -202,8 +211,17 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 
 	log.G(Ctx).Debug("--- Writing file")
 
-	_, err = f.WriteString(sbatch_macros + "\n" + strings.Join(command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".err \n echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".status" + postfix)
-	defer f.Close()
+	var stringToBeWritten string
+
+	stringToBeWritten += sbatch_macros
+
+	for _, singularityCommand := range commands {
+		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".err; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
+	}
+
+	stringToBeWritten += "\n" + postfix
+
+	_, err = f.WriteString(stringToBeWritten)
 
 	if err != nil {
 		log.G(Ctx).Error(err)
@@ -240,10 +258,10 @@ func slurm_batch_submit(path string) (string, error) {
 	return string(execReturn.Stdout), nil
 }
 
-func handle_jid(container v1.Container, podUID string, output string, pod v1.Pod) error {
+func handle_jid(podUID string, output string, pod v1.Pod) error {
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
-	f, err := os.Create(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
+	f, err := os.Create(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
 	if err != nil {
 		log.G(Ctx).Error("Can't create jid_file")
 		return err
@@ -294,9 +312,9 @@ func removeJID(jidToBeRemoved string) {
 	}
 }
 
-func delete_container(container v1.Container, podUID string) error {
-	log.G(Ctx).Info("- Deleting container " + container.Name)
-	data, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
+func delete_container(podUID string) error {
+	log.G(Ctx).Info("- Deleting job for pod " + podUID)
+	data, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
 	if err != nil {
 		log.G(Ctx).Error(err)
 		return err
@@ -313,10 +331,10 @@ func delete_container(container v1.Container, podUID string) error {
 	} else {
 		log.G(Ctx).Info("- Deleted job ", jid)
 	}
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".out")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".err")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".status")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
+	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".out")
+	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".err")
+	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".status")
+	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
 	return nil
 }
 

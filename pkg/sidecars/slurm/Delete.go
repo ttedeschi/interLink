@@ -35,20 +35,16 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, pod := range req {
-		containers := pod.Spec.Containers
-
-		for _, container := range containers {
-			err = delete_container(container, string(pod.UID))
-			if err != nil {
-				statusCode = http.StatusInternalServerError
-				w.WriteHeader(statusCode)
-				w.Write([]byte("Error deleting containers. Check Slurm Sidecar's logs"))
-				log.G(Ctx).Error(err)
-				return
-			}
-			if os.Getenv("SHARED_FS") != "true" {
-				err = os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID))
-			}
+		err = delete_container(string(pod.UID))
+		if err != nil {
+			statusCode = http.StatusInternalServerError
+			w.WriteHeader(statusCode)
+			w.Write([]byte("Error deleting containers. Check Slurm Sidecar's logs"))
+			log.G(Ctx).Error(err)
+			return
+		}
+		if os.Getenv("SHARED_FS") != "true" {
+			err = os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID))
 		}
 	}
 
