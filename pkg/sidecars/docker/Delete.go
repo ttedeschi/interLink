@@ -61,23 +61,25 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			cmd = []string{"rm", execReturn.Stdout}
-			shell = exec.ExecTask{
-				Command: "docker",
-				Args:    cmd,
-				Shell:   true,
-			}
-			execReturn, _ = shell.Execute()
-			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
+			if execReturn.Stdout != "" {
+				cmd = []string{"rm", execReturn.Stdout}
+				shell = exec.ExecTask{
+					Command: "docker",
+					Args:    cmd,
+					Shell:   true,
+				}
+				execReturn, _ = shell.Execute()
+				execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
-			if execReturn.Stderr != "" {
-				log.G(Ctx).Error("-- Error deleting container " + container.Name)
-				statusCode = http.StatusInternalServerError
-				w.WriteHeader(statusCode)
-				w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
-				return
-			} else {
-				log.G(Ctx).Info("- Deleted container " + container.Name)
+				if execReturn.Stderr != "" {
+					log.G(Ctx).Error("-- Error deleting container " + container.Name)
+					statusCode = http.StatusInternalServerError
+					w.WriteHeader(statusCode)
+					w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
+					return
+				} else {
+					log.G(Ctx).Info("- Deleted container " + container.Name)
+				}
 			}
 
 			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID))

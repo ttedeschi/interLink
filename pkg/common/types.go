@@ -14,9 +14,10 @@ const (
 )
 
 type PodStatus struct {
-	PodName      string `json:"name"`
-	PodNamespace string `json:"namespace"`
-	PodStatus    uint   `json:"status"`
+	PodName      string               `json:"name"`
+	PodNamespace string               `json:"namespace"`
+	Containers   []v1.ContainerStatus `json:"containers"`
+	PodStatus    uint                 `json:"status"`
 }
 
 type RetrievedContainer struct {

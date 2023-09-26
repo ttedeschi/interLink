@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -113,7 +112,7 @@ func main() {
 	}
 
 	var kubecfg *rest.Config
-	kubecfgFile, err := ioutil.ReadFile(os.Getenv("KUBECONFIG"))
+	kubecfgFile, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		log.G(ctx).Error(err)
 		log.G(ctx).Info("Trying InCluster configuration")

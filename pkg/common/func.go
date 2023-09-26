@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/containerd/containerd/log"
@@ -20,6 +21,7 @@ import (
 )
 
 var InterLinkConfigInst InterLinkConfig
+var Clientset *kubernetes.Clientset
 
 func NewInterLinkConfig() {
 	if InterLinkConfigInst.set == false {
