@@ -230,7 +230,7 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	var hasInitContainers bool = false
 	var state v1.ContainerState
 	defer span.End()
-	distribution := "docker://"
+	//distribution := "docker://"
 	// Add the pod's coordinates to the current span.
 	ctx = addAttributes(ctx, span, NamespaceKey, pod.Namespace, NameKey, pod.Name)
 	key, err := BuildKey(pod)
@@ -250,18 +250,23 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	}
 	state = running_state
 
+	err = RemoteExecution(p, ctx, CREATE, "", pod)
+	if err != nil {
+		return err
+	}
+
 	// in case we have initContainers we need to stop main containers from executing for now ...
 	if len(pod.Spec.InitContainers) > 0 {
 		state = waiting_state
 		hasInitContainers = true
 		// run init container with remote execution enabled
-		for _, container := range pod.Spec.InitContainers {
+		/*for _, container := range pod.Spec.InitContainers {
 			// MUST TODO: Run init containers sequentialy and NOT all-together
 			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 			if err != nil {
 				return err
 			}
-		}
+		}*/
 
 		pod.Status = v1.PodStatus{
 			Phase:     v1.PodRunning,
@@ -307,14 +312,14 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	}
 	// deploy main containers
 	for _, container := range pod.Spec.Containers {
-		var err error
+		//var err error
 
-		if !hasInitContainers {
+		/*if !hasInitContainers {
 			err = RemoteExecution(p, ctx, CREATE, distribution+container.Image, pod, container)
 			if err != nil {
 				return err
 			}
-		}
+		}*/
 		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, v1.ContainerStatus{
 			Name:         container.Name,
 			Image:        container.Image,
@@ -375,7 +380,13 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	pod.Status.Phase = v1.PodSucceeded
 	pod.Status.Reason = "KNOCProviderPodDeleted"
 
-	for _, container := range pod.Spec.Containers {
+	err = RemoteExecution(p, ctx, DELETE, "", pod)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return err
+	}
+
+	/*for _, container := range pod.Spec.Containers {
 		err = RemoteExecution(p, ctx, DELETE, "", pod, container)
 		if err != nil {
 			log.G(ctx).Error(err)
@@ -391,7 +402,7 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 			return err
 		}
 
-	}
+	}*/
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false
 		pod.Status.ContainerStatuses[idx].State = v1.ContainerState{

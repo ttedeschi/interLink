@@ -128,7 +128,8 @@ func NewServiceAccount() error {
 
 	defer f.Close()
 
-	script = "SERVICE_ACCOUNT_NAME=" + InterLinkConfigInst.ServiceAccount + "\n" +
+	script = "#!" + InterLinkConfigInst.BashPath + "\n" +
+		"SERVICE_ACCOUNT_NAME=" + InterLinkConfigInst.ServiceAccount + "\n" +
 		"CONTEXT=$(kubectl config current-context)\n" +
 		"NAMESPACE=" + InterLinkConfigInst.Namespace + "\n" +
 		"NEW_CONTEXT=" + InterLinkConfigInst.Namespace + "\n" +

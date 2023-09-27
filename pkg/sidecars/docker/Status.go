@@ -37,7 +37,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, pod := range req {
-		resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.UNKNOWN})
+		resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace})
 		for _, container := range pod.Spec.Containers {
 			log.G(Ctx).Debug("- Getting status for container " + container.Name)
 			cmd := []string{"ps -af name=^" + container.Name + "$ --format \"{{.Status}}\""}
@@ -58,18 +58,20 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 			containerstatus := strings.Split(execReturn.Stdout, " ")
 
-			if containerstatus[0] == "" {
+			if execReturn.Stdout != "" {
+				if containerstatus[0] == "Created" {
+					log.G(Ctx).Info("-- Container " + container.Name + " is going ready...")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}, Ready: false})
+				} else if containerstatus[0] == "Up" {
+					log.G(Ctx).Info("-- Container " + container.Name + " is running")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}, Ready: true})
+				} else if containerstatus[0] == "Exited" {
+					log.G(Ctx).Info("-- Container " + container.Name + " has been stopped")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, Ready: false})
+				}
+			} else {
 				log.G(Ctx).Info("-- Container " + container.Name + " doesn't exist")
-				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}})
-			} else if containerstatus[0] == "Created" {
-				log.G(Ctx).Info("-- Container " + container.Name + " is going ready...")
-				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}})
-			} else if containerstatus[0] == "Up" {
-				log.G(Ctx).Info("-- Container " + container.Name + " is running")
-				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}})
-			} else if containerstatus[0] == "Exited" {
-				log.G(Ctx).Info("-- Container " + container.Name + " has been stopped")
-				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}})
+				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, Ready: false})
 			}
 		}
 	}

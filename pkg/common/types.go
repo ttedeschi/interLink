@@ -7,17 +7,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const (
-	RUNNING = 0
-	STOP    = 1
-	UNKNOWN = 2
-)
-
 type PodStatus struct {
 	PodName      string               `json:"name"`
 	PodNamespace string               `json:"namespace"`
 	Containers   []v1.ContainerStatus `json:"containers"`
-	PodStatus    uint                 `json:"status"`
 }
 
 type RetrievedContainer struct {
@@ -85,9 +78,4 @@ type LogStruct struct {
 	PodName       string           `json:"PodName"`
 	ContainerName string           `json:"ContainerName"`
 	Opts          ContainerLogOpts `json:"Opts"`
-}
-
-type JidStruct struct {
-	PodName string   `json:"PodName"`
-	JIDs    []string `json:"JIDs"`
 }

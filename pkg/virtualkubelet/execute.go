@@ -17,7 +17,7 @@ import (
 )
 
 func createRequest(pods []*v1.Pod, token string) ([]byte, error) {
-	var returnValue, _ = json.Marshal(commonIL.PodStatus{PodStatus: commonIL.UNKNOWN})
+	var returnValue, _ = json.Marshal(commonIL.PodStatus{})
 
 	bodyBytes, err := json.Marshal(pods)
 	if err != nil {
@@ -54,7 +54,7 @@ func createRequest(pods []*v1.Pod, token string) ([]byte, error) {
 }
 
 func deleteRequest(pods []*v1.Pod, token string) ([]byte, error) {
-	returnValue, _ := json.Marshal(commonIL.PodStatus{PodStatus: commonIL.UNKNOWN})
+	returnValue, _ := json.Marshal(commonIL.PodStatus{})
 
 	bodyBytes, err := json.Marshal(pods)
 	if err != nil {
@@ -130,7 +130,7 @@ func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
 	return returnValue, nil
 }
 
-func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, imageLocation string, pod *v1.Pod, container v1.Container) error {
+func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, imageLocation string, pod *v1.Pod) error {
 	var req []*v1.Pod
 	req = []*v1.Pod{pod}
 
@@ -216,8 +216,8 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 					toBeDeleted = false
 					updatePod = true
 					if pod.Status.ContainerStatuses != nil {
-						pod.Status.ContainerStatuses[index].State.Running = containerStatus.State.Running
-						pod.Status.ContainerStatuses[index].Ready = true
+						pod.Status.ContainerStatuses[index].State = containerStatus.State
+						pod.Status.ContainerStatuses[index].Ready = containerStatus.Ready
 					}
 				}
 			}
