@@ -39,6 +39,7 @@ type InterLinkConfig struct {
 	Sidecarurl     string `yaml:"SidecarURL"`
 	Sbatchpath     string `yaml:"SbatchPath"`
 	Scancelpath    string `yaml:"ScancelPath"`
+	Squeuepath     string `yaml:"SqueuePath"`
 	Interlinkport  string `yaml:"InterlinkPort"`
 	Sidecarport    string `yaml:"SidecarPort"`
 	Commandprefix  string `yaml:"CommandPrefix"`

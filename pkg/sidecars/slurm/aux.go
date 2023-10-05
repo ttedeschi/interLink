@@ -3,13 +3,12 @@ package slurm
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
+	"time"
 
 	exec2 "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
@@ -24,7 +23,14 @@ var prefix string
 var Clientset *kubernetes.Clientset
 var Ctx context.Context
 var kubecfg *rest.Config
-var JIDs []commonIL.JidStruct
+var JIDs []JidStruct
+
+type JidStruct struct {
+	PodUID    string    `json:"PodName"`
+	JID       string    `json:"JID"`
+	StartTime time.Time `json:"StartTime"`
+	EndTime   time.Time `json:"EndTime"`
+}
 
 type SingularityCommand struct {
 	containerName string
@@ -272,70 +278,47 @@ func handle_jid(podUID string, output string, pod v1.Pod) error {
 		log.G(Ctx).Error(err)
 		return err
 	}
+	JIDs = append(JIDs, JidStruct{PodUID: string(pod.UID), JID: string(jid[1])})
+	log.G(Ctx).Info("Job ID is: " + jid[1])
 	return nil
 }
 
 func removeJID(jidToBeRemoved string) {
-	for i, JID := range JIDs {
-		for j, jid := range JID.JIDs {
-			if jid == jidToBeRemoved {
-				if len(JID.JIDs) == 1 {
-					if len(JIDs) == 1 {
-						JIDs = nil
-						return
-					}
-
-					if i == 0 {
-						JIDs = JIDs[1:]
-						return
-					} else if i == len(JIDs)-1 {
-						JIDs = JIDs[:j]
-						return
-					} else {
-						JIDs = append(JIDs[:i-1], JIDs[i+1:]...)
-						return
-					}
-				}
-				if j == 0 {
-					JID.JIDs = JID.JIDs[1:]
-					return
-				} else if j == len(JID.JIDs)-1 {
-					JID.JIDs = JID.JIDs[:j]
-					return
-				} else {
-					JID.JIDs = append(JID.JIDs[:j-1], JID.JIDs[j+1:]...)
-					return
-				}
-
+	for i, jid := range JIDs {
+		if jid.JID == jidToBeRemoved {
+			if len(JIDs) == 1 {
+				JIDs = nil
+			} else if i == 0 {
+				JIDs = JIDs[1:]
+			} else if i == len(JIDs)-1 {
+				JIDs = JIDs[:i]
+			} else {
+				JIDs = append(JIDs[:i-1], JIDs[i+1:]...)
+				return
 			}
 		}
 	}
 }
 
 func delete_container(podUID string) error {
-	log.G(Ctx).Info("- Deleting job for pod " + podUID)
-	data, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
+	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
+	for _, jid := range JIDs {
+		if jid.PodUID == podUID {
+			_, err := exec.Command(commonIL.InterLinkConfigInst.Scancelpath, jid.JID).Output()
+			if err != nil {
+				log.G(Ctx).Error(err)
+				return err
+			} else {
+				log.G(Ctx).Info("- Deleted Job ", jid.JID)
+			}
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".out")
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".err")
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".status")
+			removeJID(jid.JID)
+			return nil
+		}
 	}
-	jid, err := strconv.Atoi(string(data))
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
-	}
-	_, err = exec.Command(commonIL.InterLinkConfigInst.Scancelpath, fmt.Sprint(jid)).Output()
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
-	} else {
-		log.G(Ctx).Info("- Deleted job ", jid)
-	}
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".out")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".err")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".status")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
-	return nil
+	return errors.New("Unable to find a JID for the provided pod")
 }
 
 func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, []string, error) {

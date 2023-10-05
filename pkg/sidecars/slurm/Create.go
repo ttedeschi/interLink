@@ -35,6 +35,10 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, test := range req {
+		log.G(Ctx).Debug(test.Pod.Name)
+	}
+
 	for _, data := range req {
 		var metadata metav1.ObjectMeta
 		var containers []v1.Container
@@ -108,27 +112,6 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 			err = delete_container(string(data.Pod.UID))
 			return
-		}
-
-		jid, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + string(data.Pod.UID) + ".jid")
-		if err != nil {
-			statusCode = http.StatusInternalServerError
-			w.WriteHeader(statusCode)
-			w.Write([]byte("Some errors occurred while creating container. Check Slurm Sidecar's logs"))
-			log.G(Ctx).Error(err)
-			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
-			return
-		}
-
-		flag := true
-		for _, JID := range JIDs {
-			if JID.PodName == data.Pod.Name {
-				flag = false
-				JID.JIDs = append(JID.JIDs, string(jid))
-			}
-		}
-		if flag {
-			JIDs = append(JIDs, commonIL.JidStruct{PodName: data.Pod.Name, JIDs: []string{string(jid)}})
 		}
 	}
 
