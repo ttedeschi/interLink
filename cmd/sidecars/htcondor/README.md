@@ -6,7 +6,7 @@ First of all, let's download this repo:
 ```
 git clone https://github.com/ttedeschi/InterLink_HTCondor_sidecar.git
 ```
-modify the [config file](SidecarConfig.yaml) accordingly.
+modify the [config file](SidecarConfig.yaml) properly.
 Then to run the server you just have to enter:
 ```
 cd InterLink_HTCondor_sidecar
