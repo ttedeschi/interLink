@@ -1,26 +1,24 @@
 import json
 import os
-import time
 import subprocess
 import logging
 import yaml
-import shutil
 import argparse
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--schedd-name", help="Schedd name", type=str, default = "")
 parser.add_argument("--schedd-host", help="Schedd host", type=str, default = "")
-parser.add_argument("--collector-host", help="Collector-host", type=str, default = "")
-parser.add_argument("--cadir", help="CA directory", type=str, default = "")
-parser.add_argument("--certfile", help="cert file", type=str, default = "")
-parser.add_argument("--keyfile", help="key file", type=str, default = "")
-parser.add_argument("--auth-method", help="Default authentication methods", type=str, default = "")
+parser.add_argument("--collector-host", help="Collector-host", type=str, default="")
+parser.add_argument("--cadir", help="CA directory", type=str, default="")
+parser.add_argument("--certfile", help="cert file", type=str, default="")
+parser.add_argument("--keyfile", help="key file", type=str, default="")
+parser.add_argument("--auth-method", help="Default authentication methods", type=str, default ="")
 parser.add_argument("--debug", help="Debug level", type=str, default = "")
-parser.add_argument("--condor-config", help="Path to condor_config file", type=str, default = "")
-parser.add_argument("--proxy", help="Path to proxy file", type=str, default = "")
+parser.add_argument("--condor-config", help="Path to condor_config file", type=str, default="")
+parser.add_argument("--proxy", help="Path to proxy file", type=str, default="")
 parser.add_argument("--dummy-job", action = 'store_true', help="Whether the job should be a real job or a dummy sleep job for debugging purposes")
-parser.add_argument("--port", help="Server port", type=int, default = 8000)
+parser.add_argument("--port", help="Server port", type=int, default=8000)
 
 args = parser.parse_args()
 
