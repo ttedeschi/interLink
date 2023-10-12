@@ -43,11 +43,6 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		retrieved_data = append(retrieved_data, data)
 
 		if retrieved_data != nil {
-			for _, test := range retrieved_data {
-				for _, test2 := range test.Containers {
-					log.G(Ctx).Debug(test2.Name)
-				}
-			}
 			bodyBytes, err = json.Marshal(retrieved_data)
 			//log.G(Ctx).Debug(string(bodyBytes))
 			reader := bytes.NewReader(bodyBytes)
