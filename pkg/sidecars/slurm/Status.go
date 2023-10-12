@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,13 +57,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, pod := range req {
-		var flag = false
-		for _, JID := range JIDs {
-			for _, jid := range JID.JIDs {
-
-				cmd := []string{"-c", "squeue --me | grep " + jid}
+		for i, jid := range JIDs {
+			if jid.PodUID == string(pod.UID) {
+				cmd := []string{"--noheader", "-a", "-j " + jid.JID}
 				shell := exec.ExecTask{
-					Command: "bash",
+					Command: commonIL.InterLinkConfigInst.Squeuepath,
 					Args:    cmd,
 					Shell:   true,
 				}
@@ -72,21 +73,69 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("Error executing Squeue. Check Slurm Sidecar's logs"))
 					log.G(Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
 					return
-				} else if execReturn.Stdout != "" {
-					flag = true
-					log.G(Ctx).Info(execReturn.Stdout)
-				} else if execReturn.Stdout == "" {
-					removeJID(jid)
+				} else {
+					pattern := `(CD|CG|F|PD|PR|R|S|ST)`
+					re := regexp.MustCompile(pattern)
+					match := re.FindString(execReturn.Stdout)
+
+					log.G(Ctx).Info("JID: " + jid.JID + " | Status: " + match + " | Pod: " + pod.Name)
+
+					switch match {
+					case "CD":
+						if jid.EndTime.IsZero() {
+							JIDs[i].EndTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Time{JIDs[i].StartTime}, FinishedAt: metav1.Time{JIDs[i].EndTime}}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "CG":
+						if jid.StartTime.IsZero() {
+							JIDs[i].StartTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{JIDs[i].StartTime}}}, Ready: true}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "F":
+						if jid.EndTime.IsZero() {
+							JIDs[i].EndTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Time{JIDs[i].StartTime}, FinishedAt: metav1.Time{JIDs[i].EndTime}}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "PD":
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "PR":
+						if jid.EndTime.IsZero() {
+							JIDs[i].EndTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Time{JIDs[i].StartTime}, FinishedAt: metav1.Time{JIDs[i].EndTime}}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "R":
+						if jid.StartTime.IsZero() {
+							JIDs[i].StartTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{JIDs[i].StartTime}}}, Ready: true}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "S":
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					case "ST":
+						if jid.EndTime.IsZero() {
+							JIDs[i].EndTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Time{JIDs[i].StartTime}, FinishedAt: metav1.Time{JIDs[i].EndTime}}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					default:
+						if jid.EndTime.IsZero() {
+							JIDs[i].EndTime = time.Now()
+						}
+						containerStatus := v1.ContainerStatus{Name: pod.Spec.Containers[0].Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Time{JIDs[i].StartTime}, FinishedAt: metav1.Time{JIDs[i].EndTime}}}, Ready: false}
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: []v1.ContainerStatus{containerStatus}})
+					}
 				}
 			}
 		}
-
-		if flag {
-			resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.RUNNING})
-		} else {
-			resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.STOP})
-		}
 	}
+
+	log.G(Ctx).Debug(resp)
 
 	w.WriteHeader(statusCode)
 	if statusCode != http.StatusOK {

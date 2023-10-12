@@ -3,13 +3,12 @@ package slurm
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
+	"time"
 
 	exec2 "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
@@ -24,7 +23,19 @@ var prefix string
 var Clientset *kubernetes.Clientset
 var Ctx context.Context
 var kubecfg *rest.Config
-var JIDs []commonIL.JidStruct
+var JIDs []JidStruct
+
+type JidStruct struct {
+	PodUID    string    `json:"PodName"`
+	JID       string    `json:"JID"`
+	StartTime time.Time `json:"StartTime"`
+	EndTime   time.Time `json:"EndTime"`
+}
+
+type SingularityCommand struct {
+	containerName string
+	command       []string
+}
 
 func prepare_envs(container v1.Container) []string {
 	log.G(Ctx).Info("-- Appending envs")
@@ -132,9 +143,9 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 	return append(mount, mount_data), nil
 }
 
-func produce_slurm_script(container v1.Container, podUID string, metadata metav1.ObjectMeta, command []string) (string, error) {
+func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []SingularityCommand) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
-	path := commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".sh"
+	path := commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".sh"
 	postfix := ""
 
 	err := os.RemoveAll(path)
@@ -143,6 +154,8 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 		return "", err
 	}
 	f, err := os.Create(path)
+	defer f.Close()
+
 	if err != nil {
 		log.G(Ctx).Error("Unable to create file " + path)
 		return "", err
@@ -158,7 +171,9 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 	if mpi_flags, ok := metadata.Annotations["slurm-job.knoc.io/mpi-flags"]; ok {
 		if mpi_flags != "true" {
 			mpi := append([]string{"mpiexec", "-np", "$SLURM_NTASKS"}, strings.Split(mpi_flags, " ")...)
-			command = append(mpi, command...)
+			for _, singularityCommand := range commands {
+				singularityCommand.command = append(mpi, singularityCommand.command...)
+			}
 		}
 	}
 	for _, slurm_flag := range sbatch_flags_from_argo {
@@ -182,8 +197,8 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 
 		prefix += "\nssh -4 -N -D $port " + commonIL.InterLinkConfigInst.Tsockslogin + " &"
 		prefix += "\nSSH_PID=$!"
-		prefix += "\necho \"local = 10.0.0.0/255.0.0.0 \nserver = 127.0.0.1 \nserver_port = $port\" >> .tmp/" + podUID + "_" + container.Name + "_tsocks.conf"
-		prefix += "\nexport TSOCKS_CONF_FILE=.tmp/" + podUID + "_" + container.Name + "_tsocks.conf && export LD_PRELOAD=" + commonIL.InterLinkConfigInst.Tsockspath
+		prefix += "\necho \"local = 10.0.0.0/255.0.0.0 \nserver = 127.0.0.1 \nserver_port = $port\" >> .tmp/" + podUID + "_tsocks.conf"
+		prefix += "\nexport TSOCKS_CONF_FILE=.tmp/" + podUID + "_tsocks.conf && export LD_PRELOAD=" + commonIL.InterLinkConfigInst.Tsockspath
 	}
 
 	if commonIL.InterLinkConfigInst.Commandprefix != "" {
@@ -191,7 +206,7 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 	}
 
 	sbatch_macros := "#!" + commonIL.InterLinkConfigInst.BashPath +
-		"\n#SBATCH --job-name=" + podUID + "_" + container.Name +
+		"\n#SBATCH --job-name=" + podUID +
 		sbatch_flags_as_string +
 		"\n. ~/.bash_profile" +
 		//"\nmodule load singularity" +
@@ -202,8 +217,17 @@ func produce_slurm_script(container v1.Container, podUID string, metadata metav1
 
 	log.G(Ctx).Debug("--- Writing file")
 
-	_, err = f.WriteString(sbatch_macros + "\n" + strings.Join(command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".err \n echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".status" + postfix)
-	defer f.Close()
+	var stringToBeWritten string
+
+	stringToBeWritten += sbatch_macros
+
+	for _, singularityCommand := range commands {
+		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".err; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
+	}
+
+	stringToBeWritten += "\n" + postfix
+
+	_, err = f.WriteString(stringToBeWritten)
 
 	if err != nil {
 		log.G(Ctx).Error(err)
@@ -240,10 +264,10 @@ func slurm_batch_submit(path string) (string, error) {
 	return string(execReturn.Stdout), nil
 }
 
-func handle_jid(container v1.Container, podUID string, output string, pod v1.Pod) error {
+func handle_jid(podUID string, output string, pod v1.Pod) error {
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
-	f, err := os.Create(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
+	f, err := os.Create(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".jid")
 	if err != nil {
 		log.G(Ctx).Error("Can't create jid_file")
 		return err
@@ -254,70 +278,47 @@ func handle_jid(container v1.Container, podUID string, output string, pod v1.Pod
 		log.G(Ctx).Error(err)
 		return err
 	}
+	JIDs = append(JIDs, JidStruct{PodUID: string(pod.UID), JID: string(jid[1])})
+	log.G(Ctx).Info("Job ID is: " + jid[1])
 	return nil
 }
 
 func removeJID(jidToBeRemoved string) {
-	for i, JID := range JIDs {
-		for j, jid := range JID.JIDs {
-			if jid == jidToBeRemoved {
-				if len(JID.JIDs) == 1 {
-					if len(JIDs) == 1 {
-						JIDs = nil
-						return
-					}
-
-					if i == 0 {
-						JIDs = JIDs[1:]
-						return
-					} else if i == len(JIDs)-1 {
-						JIDs = JIDs[:j]
-						return
-					} else {
-						JIDs = append(JIDs[:i-1], JIDs[i+1:]...)
-						return
-					}
-				}
-				if j == 0 {
-					JID.JIDs = JID.JIDs[1:]
-					return
-				} else if j == len(JID.JIDs)-1 {
-					JID.JIDs = JID.JIDs[:j]
-					return
-				} else {
-					JID.JIDs = append(JID.JIDs[:j-1], JID.JIDs[j+1:]...)
-					return
-				}
-
+	for i, jid := range JIDs {
+		if jid.JID == jidToBeRemoved {
+			if len(JIDs) == 1 {
+				JIDs = nil
+			} else if i == 0 {
+				JIDs = JIDs[1:]
+			} else if i == len(JIDs)-1 {
+				JIDs = JIDs[:i]
+			} else {
+				JIDs = append(JIDs[:i-1], JIDs[i+1:]...)
+				return
 			}
 		}
 	}
 }
 
-func delete_container(container v1.Container, podUID string) error {
-	log.G(Ctx).Info("- Deleting container " + container.Name)
-	data, err := os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
+func delete_container(podUID string) error {
+	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
+	for _, jid := range JIDs {
+		if jid.PodUID == podUID {
+			_, err := exec.Command(commonIL.InterLinkConfigInst.Scancelpath, jid.JID).Output()
+			if err != nil {
+				log.G(Ctx).Error(err)
+				return err
+			} else {
+				log.G(Ctx).Info("- Deleted Job ", jid.JID)
+			}
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".out")
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".err")
+			os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + ".status")
+			removeJID(jid.JID)
+			return nil
+		}
 	}
-	jid, err := strconv.Atoi(string(data))
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
-	}
-	_, err = exec.Command(commonIL.InterLinkConfigInst.Scancelpath, fmt.Sprint(jid)).Output()
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
-	} else {
-		log.G(Ctx).Info("- Deleted job ", jid)
-	}
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".out")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".err")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".status")
-	os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + container.Name + ".jid")
-	return nil
+	return errors.New("Unable to find a JID for the provided pod")
 }
 
 func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, []string, error) {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
@@ -29,7 +28,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 	var retrieved_data []commonIL.RetrievedPodData
 	for _, pod := range req2 {
 
-		data := []commonIL.RetrievedPodData{}
+		data := commonIL.RetrievedPodData{}
 		if commonIL.InterLinkConfigInst.ExportPodData {
 			data, err = getData(pod)
 			if err != nil {
@@ -37,29 +36,15 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(statusCode)
 				return
 			}
-			log.G(Ctx).Debug(data)
+			//log.G(Ctx).Debug(data)
 
 		}
-		data = []commonIL.RetrievedPodData{}
-		if commonIL.InterLinkConfigInst.ExportPodData {
-			data, err = getData(pod)
-			if err != nil {
-				statusCode = http.StatusInternalServerError
-				w.WriteHeader(statusCode)
-				return
-			}
-			log.G(Ctx).Debug(data)
-		}
 
-		if data == nil {
-			data = append(data, commonIL.RetrievedPodData{Pod: *pod})
-		}
-
-		retrieved_data = append(retrieved_data, data...)
+		retrieved_data = append(retrieved_data, data)
 
 		if retrieved_data != nil {
 			bodyBytes, err = json.Marshal(retrieved_data)
-			log.G(Ctx).Debug(string(bodyBytes))
+			//log.G(Ctx).Debug(string(bodyBytes))
 			reader := bytes.NewReader(bodyBytes)
 
 			req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/create", reader)
@@ -72,14 +57,13 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 			log.G(Ctx).Info("InterLink: forwarding Create call to sidecar")
 			var resp *http.Response
-			for {
-				resp, err = http.DefaultClient.Do(req)
-				if err != nil {
-					log.G(Ctx).Error(err)
-					time.Sleep(time.Second * 5)
-				} else {
-					break
-				}
+
+			resp, err = http.DefaultClient.Do(req)
+			if err != nil {
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				log.G(Ctx).Error(err)
+				return
 			}
 
 			statusCode = resp.StatusCode

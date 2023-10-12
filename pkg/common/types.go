@@ -7,16 +7,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const (
-	RUNNING = 0
-	STOP    = 1
-	UNKNOWN = 2
-)
-
 type PodStatus struct {
-	PodName      string `json:"name"`
-	PodNamespace string `json:"namespace"`
-	PodStatus    uint   `json:"status"`
+	PodName      string               `json:"name"`
+	PodNamespace string               `json:"namespace"`
+	Containers   []v1.ContainerStatus `json:"containers"`
 }
 
 type RetrievedContainer struct {
@@ -45,6 +39,7 @@ type InterLinkConfig struct {
 	Sidecarurl     string `yaml:"SidecarURL"`
 	Sbatchpath     string `yaml:"SbatchPath"`
 	Scancelpath    string `yaml:"ScancelPath"`
+	Squeuepath     string `yaml:"SqueuePath"`
 	Interlinkport  string `yaml:"InterlinkPort"`
 	Sidecarport    string `yaml:"SidecarPort"`
 	Commandprefix  string `yaml:"CommandPrefix"`
@@ -84,9 +79,4 @@ type LogStruct struct {
 	PodName       string           `json:"PodName"`
 	ContainerName string           `json:"ContainerName"`
 	Opts          ContainerLogOpts `json:"Opts"`
-}
-
-type JidStruct struct {
-	PodName string   `json:"PodName"`
-	JIDs    []string `json:"JIDs"`
 }

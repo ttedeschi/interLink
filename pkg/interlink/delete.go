@@ -52,7 +52,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			log.G(Ctx).Debug("InterLink: " + string(returnValue))
 			var returnJson []commonIL.PodStatus
-			returnJson = append(returnJson, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.STOP})
+			returnJson = append(returnJson, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace})
 
 			bodyBytes, err = json.Marshal(returnJson)
 			if err != nil {

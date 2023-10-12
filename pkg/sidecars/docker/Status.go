@@ -36,10 +36,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, pod := range req {
+	for i, pod := range req {
+		resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace})
 		for _, container := range pod.Spec.Containers {
 			log.G(Ctx).Debug("- Getting status for container " + container.Name)
-			cmd := []string{"ps -aqf name=" + container.Name}
+			cmd := []string{"ps -af name=^" + container.Name + "$ --format \"{{.Status}}\""}
 
 			shell := exec.ExecTask{
 				Command: "docker",
@@ -55,12 +56,22 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			if execReturn.Stdout == "" {
-				log.G(Ctx).Info("-- Container " + container.Name + " is not running")
-				resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.STOP})
+			containerstatus := strings.Split(execReturn.Stdout, " ")
+
+			if execReturn.Stdout != "" {
+				if containerstatus[0] == "Created" {
+					log.G(Ctx).Info("-- Container " + container.Name + " is going ready...")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}, Ready: false})
+				} else if containerstatus[0] == "Up" {
+					log.G(Ctx).Info("-- Container " + container.Name + " is running")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}, Ready: true})
+				} else if containerstatus[0] == "Exited" {
+					log.G(Ctx).Info("-- Container " + container.Name + " has been stopped")
+					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, Ready: false})
+				}
 			} else {
-				log.G(Ctx).Info("-- Container " + container.Name + " is running")
-				resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, PodStatus: commonIL.RUNNING})
+				log.G(Ctx).Info("-- Container " + container.Name + " doesn't exist")
+				resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, Ready: false})
 			}
 		}
 	}
