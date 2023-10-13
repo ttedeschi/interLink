@@ -76,6 +76,7 @@ type ContainerLogOpts struct {
 
 type LogStruct struct {
 	Namespace     string           `json:"Namespace"`
+	PodUID        string           `json:"PodUID"`
 	PodName       string           `json:"PodName"`
 	ContainerName string           `json:"ContainerName"`
 	Opts          ContainerLogOpts `json:"Opts"`

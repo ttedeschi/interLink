@@ -27,6 +27,7 @@ func main() {
 	mutex.HandleFunc("/status", slurm.StatusHandler)
 	mutex.HandleFunc("/create", slurm.SubmitHandler)
 	mutex.HandleFunc("/delete", slurm.StopHandler)
+	mutex.HandleFunc("/getLogs", slurm.GetLogsHandler)
 
 	err := http.ListenAndServe(":"+commonIL.InterLinkConfigInst.Sidecarport, mutex)
 	if err != nil {
