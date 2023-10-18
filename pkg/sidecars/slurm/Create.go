@@ -9,8 +9,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func SubmitHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,11 +38,8 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, data := range req {
-		var metadata metav1.ObjectMeta
-		var containers []v1.Container
-
-		containers = data.Pod.Spec.Containers
-		metadata = data.Pod.ObjectMeta
+		containers := data.Pod.Spec.Containers
+		metadata := data.Pod.ObjectMeta
 
 		var singularity_command_pod []SingularityCommand
 

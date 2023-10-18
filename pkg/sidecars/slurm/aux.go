@@ -24,6 +24,8 @@ var Clientset *kubernetes.Clientset
 var Ctx context.Context
 var kubecfg *rest.Config
 var JIDs []JidStruct
+var timer time.Time
+var cachedStatus []commonIL.PodStatus
 
 type JidStruct struct {
 	PodUID    string    `json:"PodName"`
@@ -176,6 +178,7 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 			}
 		}
 	}
+
 	for _, slurm_flag := range sbatch_flags_from_argo {
 		sbatch_flags_as_string += "\n#SBATCH " + slurm_flag
 	}
@@ -203,6 +206,10 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 
 	if commonIL.InterLinkConfigInst.Commandprefix != "" {
 		prefix += "\n" + commonIL.InterLinkConfigInst.Commandprefix
+	}
+
+	if preExecAnnotations, ok := metadata.Annotations["job.knoc.io/pre-exec"]; ok {
+		prefix += "\n" + preExecAnnotations
 	}
 
 	sbatch_macros := "#!" + commonIL.InterLinkConfigInst.BashPath +
