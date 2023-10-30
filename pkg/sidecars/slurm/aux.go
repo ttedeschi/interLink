@@ -40,23 +40,27 @@ type SingularityCommand struct {
 }
 
 func prepare_envs(container v1.Container) []string {
-	log.G(Ctx).Info("-- Appending envs")
-	env := make([]string, 1)
-	env = append(env, "--env")
-	env_data := ""
-	for _, env_var := range container.Env {
-		tmp := (env_var.Name + "=" + env_var.Value + ",")
-		env_data += tmp
+	if len(container.Env) > 0 { 
+		log.G(Ctx).Info("-- Appending envs")
+		env := make([]string, 1)
+		env = append(env, "--env")
+		env_data := ""
+		for _, env_var := range container.Env {
+			tmp := (env_var.Name + "=" + env_var.Value + ",")
+			env_data += tmp
+		}
+		if last := len(env_data) - 1; last >= 0 && env_data[last] == ',' {
+			env_data = env_data[:last]
+		}
+		if env_data == "" {
+			env = []string{}
+		}
+		env = append(env, env_data)
+	
+		return env
+	} else {
+		return []
 	}
-	if last := len(env_data) - 1; last >= 0 && env_data[last] == ',' {
-		env_data = env_data[:last]
-	}
-	if env_data == "" {
-		env = []string{}
-	}
-	env = append(env, env_data)
-
-	return env
 }
 
 func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([]string, error) {
