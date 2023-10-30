@@ -107,7 +107,7 @@ func main() {
 		NodeName:        opts.NodeName,
 		OperatingSystem: "Linux",
 		// https://github.com/liqotech/liqo/blob/d8798732002abb7452c2ff1c99b3e5098f848c93/deployments/liqo/templates/liqo-gateway-deployment.yaml#L69
-		InternalIP: "172.16.9.11",
+		InternalIP: os.Getenv("POD_IP"),
 		DaemonPort: int32(dport),
 	}
 
