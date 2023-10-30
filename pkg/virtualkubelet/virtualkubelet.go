@@ -606,9 +606,14 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 
 	log.G(ctx).Infof("receive GetPodLogs %q", podName)
 
+	key, err := BuildKeyFromNames(namespace, podName)
+	if err != nil {
+		log.G(ctx).Error(err)
+	}
+
 	logsRequest := commonIL.LogStruct{
 		Namespace:     namespace,
-		PodUID:        string(p.pods[podName].UID),
+		PodUID:        string(p.pods[key].UID),
 		PodName:       podName,
 		ContainerName: containerName,
 		Opts:          commonIL.ContainerLogOpts(opts),
