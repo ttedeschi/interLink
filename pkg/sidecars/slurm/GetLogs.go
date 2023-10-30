@@ -45,7 +45,8 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
 		return
 	} else {
-		cmd = OSexec.Command("cat", "slurm-"+req.PodUID+"_*")
+		log.G(Ctx).Info("Reading")
+		cmd = OSexec.Command("cat", ".tmp/"+req.PodUID+"_*")
 	}
 
 	output, err := cmd.CombinedOutput()
