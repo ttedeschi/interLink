@@ -40,7 +40,7 @@ type SingularityCommand struct {
 }
 
 func prepare_envs(container v1.Container) []string {
-	if len(container.Env) > 0 { 
+	if len(container.Env) > 0 {
 		log.G(Ctx).Info("-- Appending envs")
 		env := make([]string, 1)
 		env = append(env, "--env")
@@ -56,7 +56,7 @@ func prepare_envs(container v1.Container) []string {
 			env = []string{}
 		}
 		env = append(env, env_data)
-	
+
 		return env
 	} else {
 		return []string{}
@@ -233,7 +233,7 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 	stringToBeWritten += sbatch_macros
 
 	for _, singularityCommand := range commands {
-		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".err; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
+		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>&1; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
 	}
 
 	stringToBeWritten += "\n" + postfix

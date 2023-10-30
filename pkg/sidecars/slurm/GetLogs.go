@@ -45,14 +45,14 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
 		return
 	} else {
-		log.G(Ctx).Info("Reading")
-		cmd = OSexec.Command("cat", ".tmp/"+req.PodUID+"_*")
+		log.G(Ctx).Info("Reading  .tmp/" + req.PodUID + "_" + req.ContainerName + ".out")
+		cmd = OSexec.Command("cat", ".tmp/"+req.PodUID+"_"+req.ContainerName+".out")
 	}
 
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		log.G(Ctx).Error(err)
+		log.G(Ctx).Info(string(output))
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		return
