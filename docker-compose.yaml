@@ -43,7 +43,7 @@ services:
       - VKTOKENFILE=/etc/interlink/dummy_token
       - TOKEN_PATH=/etc/interlink/dummy_token
       - KUBECONFIG=/etc/interlink/kubeconfig.yaml
-      - CONFIGPATH=/etc/interlink/knoc-cfg.json
+      - CONFIGPATH=/etc/interlink/vk-cfg.json
       - NODENAME=test-vk 
     # healthcheck:
     #   test: ["CMD", "/check.sh"]

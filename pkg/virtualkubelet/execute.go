@@ -189,7 +189,7 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 			updatePod := false
 
 			pod, err := p.GetPod(ctx, podStatus.PodNamespace, podStatus.PodName)
-			log.G(ctx).Debug(pod)
+			//log.G(ctx).Debug(pod)
 			if err != nil {
 				log.G(ctx).Error(err)
 				return err

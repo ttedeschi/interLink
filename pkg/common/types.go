@@ -52,6 +52,7 @@ type InterLinkConfig struct {
 	Tsocksconfig   string `yaml:"TsocksConfig"`
 	Tsockslogin    string `yaml:"TsocksLoginNode"`
 	BashPath       string `yaml:"BashPath"`
+	PodIP          string `yaml:"Pod_IP"`
 	set            bool
 }
 
@@ -76,6 +77,7 @@ type ContainerLogOpts struct {
 
 type LogStruct struct {
 	Namespace     string           `json:"Namespace"`
+	PodUID        string           `json:"PodUID"`
 	PodName       string           `json:"PodName"`
 	ContainerName string           `json:"ContainerName"`
 	Opts          ContainerLogOpts `json:"Opts"`

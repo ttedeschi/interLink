@@ -70,6 +70,10 @@ func NewInterLinkConfig() {
 			InterLinkConfigInst.Scancelpath = os.Getenv("SCANCELPATH")
 		}
 
+		if os.Getenv("POD_IP") != "" {
+			InterLinkConfigInst.PodIP = os.Getenv("POD_IP")
+		}
+
 		if os.Getenv("TSOCKS") != "" {
 			if os.Getenv("TSOCKS") != "true" && os.Getenv("TSOCKS") != "false" {
 				fmt.Println("export TSOCKS as true or false")

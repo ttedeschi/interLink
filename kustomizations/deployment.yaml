@@ -24,7 +24,7 @@ spec:
         - --nodename
         - test-vk
         - --provider
-        - knoc
+        - interlink
         - --provider-config
         - $VK_CONFIG_PATH
         - --startup-timeout
@@ -46,14 +46,14 @@ spec:
         - name: VKTOKENFILE
           value: "/opt/interlink/token"
         - name: VK_CONFIG_PATH
-          value: "/etc/interlink/knoc-cfg.json"
+          value: "/etc/interlink/vk-cfg.json"
         volumeMounts:
         - name: config
           mountPath: /etc/interlink/InterLinkConfig.yaml
           subPath: InterLinkConfig.yaml
         - name: config-json
-          mountPath: /etc/interlink/knoc-cfg.json
-          subPath: knoc-cfg.json
+          mountPath: /etc/interlink/vk-cfg.json
+          subPath: vk-cfg.json
         - name: token
           mountPath: /opt/interlink
         resources:
@@ -90,7 +90,7 @@ spec:
         volumeMounts:
         - name: token
           mountPath: /opt/interlink
-      serviceAccountName: knoc
+      serviceAccountName: interlink
       volumes:
       - name: config
         configMap:
