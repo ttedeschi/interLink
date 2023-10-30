@@ -60,7 +60,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if strings.HasPrefix(container.Image, "/") {
-				if image_uri, ok := metadata.Annotations["slurm-job.knoc.io/image-root"]; ok {
+				if image_uri, ok := metadata.Annotations["slurm-job.vk.io/image-root"]; ok {
 					image = image_uri + container.Image
 				} else {
 					log.G(Ctx).Info("- image-uri annotation not specified for path in remote filesystem")

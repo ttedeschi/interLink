@@ -8,9 +8,9 @@ ScancelPath: "/usr/bin/scancel"
 SqueuePath: "/usr/bin/squeue"
 CommandPrefix: ""
 ExportPodData: true
-DataRootFolder: ".knoc/"
-ServiceAccount: "knoc"
-Namespace: "knoc"
+DataRootFolder: ".tmp/"
+ServiceAccount: "interlink"
+Namespace: "vk"
 Tsocks: false
 TsocksPath: "$WORK/tsocks-1.8beta5+ds1/libtsocks.so"
 TsocksLoginNode: "login01"

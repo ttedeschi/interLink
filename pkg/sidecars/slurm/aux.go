@@ -167,10 +167,10 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 
 	var sbatch_flags_from_argo []string
 	var sbatch_flags_as_string = ""
-	if slurm_flags, ok := metadata.Annotations["slurm-job.knoc.io/flags"]; ok {
+	if slurm_flags, ok := metadata.Annotations["slurm-job.vk.io/flags"]; ok {
 		sbatch_flags_from_argo = strings.Split(slurm_flags, " ")
 	}
-	if mpi_flags, ok := metadata.Annotations["slurm-job.knoc.io/mpi-flags"]; ok {
+	if mpi_flags, ok := metadata.Annotations["slurm-job.vk.io/mpi-flags"]; ok {
 		if mpi_flags != "true" {
 			mpi := append([]string{"mpiexec", "-np", "$SLURM_NTASKS"}, strings.Split(mpi_flags, " ")...)
 			for _, singularityCommand := range commands {
@@ -208,7 +208,7 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 		prefix += "\n" + commonIL.InterLinkConfigInst.Commandprefix
 	}
 
-	if preExecAnnotations, ok := metadata.Annotations["job.knoc.io/pre-exec"]; ok {
+	if preExecAnnotations, ok := metadata.Annotations["job.vk.io/pre-exec"]; ok {
 		prefix += "\n" + preExecAnnotations
 	}
 
