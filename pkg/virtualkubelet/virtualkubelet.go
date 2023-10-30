@@ -608,6 +608,7 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 
 	logsRequest := commonIL.LogStruct{
 		Namespace:     namespace,
+		PodUID:        string(p.pods[podName].UID),
 		PodName:       podName,
 		ContainerName: containerName,
 		Opts:          commonIL.ContainerLogOpts(opts),
