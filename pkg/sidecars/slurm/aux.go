@@ -233,7 +233,7 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 	stringToBeWritten += sbatch_macros
 
 	for _, singularityCommand := range commands {
-		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>&1; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
+		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " &> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
 	}
 
 	stringToBeWritten += "\n" + postfix
