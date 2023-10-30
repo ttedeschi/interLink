@@ -104,7 +104,7 @@ To customize your virtual node deployment edit the configuration files within th
     - image: Here you can specify which image to use, if you need another one. 
     - args: These are the arguments passed to the VK binary running inside the Container.
     - env: Environment Variables used by kubelet and by the VK itself. Check the ENVS list for a detailed explanation on how to set them.
-- `knoc-cfg.json`: it's the config file for the VK itself. Here you can specify how many resources to allocate for the VK. Note that the name specified here for the VK must match the name given in the others config files.
+- `vk-cfg.json`: it's the config file for the VK itself. Here you can specify how many resources to allocate for the VK. Note that the name specified here for the VK must match the name given in the others config files.
 - `InterLinkConfig.yaml`: configuration file for the inbound/outbound communication (and not only) to/from the InterLink module. For a detailed explanation of all fields, check the [InterLink Config File](#information_source-interlink-config-file) section.
 If you perform any change to the listed files, you will have to
 ```bash

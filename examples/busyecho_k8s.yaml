@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: test-pod
   annotations:
-    slurm-job.knoc.io/flags: "--job-name=testvkub  -t 2800  --ntasks=8 --nodes=1 --mem-per-cpu=2000"
+    slurm-job.vk.io/flags: "--job-name=testvkub  -t 2800  --ntasks=8 --nodes=1 --mem-per-cpu=2000"
 spec:
   restartPolicy: OnFailure 
   containers:
