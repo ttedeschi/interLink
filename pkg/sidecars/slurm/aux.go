@@ -59,7 +59,7 @@ func prepare_envs(container v1.Container) []string {
 	
 		return env
 	} else {
-		return []
+		return []string{}
 	}
 }
 
