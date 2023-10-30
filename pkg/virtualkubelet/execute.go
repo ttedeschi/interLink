@@ -155,10 +155,12 @@ func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest co
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.G(ctx).Error(err)
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.G(ctx).Info(resp.Body)
 		return nil, errors.New("Unexpected error occured while getting logs. Status code: " + strconv.Itoa(resp.StatusCode) + ". Check InterLink's logs for further informations")
 	} else {
 		return resp.Body, nil
