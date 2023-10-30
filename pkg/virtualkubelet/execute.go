@@ -139,17 +139,17 @@ func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest co
 
 	bodyBytes, err := json.Marshal(logsRequest)
 	if err != nil {
-		log.L.Error(err)
+		log.G(ctx).Error(err)
 		return nil, err
 	}
 	reader := bytes.NewReader(bodyBytes)
 	req, err := http.NewRequest(http.MethodGet, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/getLogs", reader)
 	if err != nil {
-		log.L.Error(err)
+		log.G(ctx).Error(err)
 		return nil, err
 	}
 
-	//log.L.Println(string(bodyBytes))
+	log.G(ctx).Println(string(bodyBytes))
 
 	req.Header.Add("Authorization", "Bearer "+token)
 

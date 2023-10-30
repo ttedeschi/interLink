@@ -601,6 +601,11 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 	ctx, span = trace.StartSpan(ctx, "GetLogs") //nolint: ineffassign,staticcheck
 	defer span.End()
 
+	// Add namespace and name as attributes to the current span.
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, podName)
+
+	log.G(ctx).Infof("receive GetPodLogs %q", podName)
+
 	logsRequest := commonIL.LogStruct{
 		Namespace:     namespace,
 		PodName:       podName,
