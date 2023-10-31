@@ -40,23 +40,27 @@ type SingularityCommand struct {
 }
 
 func prepare_envs(container v1.Container) []string {
-	log.G(Ctx).Info("-- Appending envs")
-	env := make([]string, 1)
-	env = append(env, "--env")
-	env_data := ""
-	for _, env_var := range container.Env {
-		tmp := (env_var.Name + "=" + env_var.Value + ",")
-		env_data += tmp
-	}
-	if last := len(env_data) - 1; last >= 0 && env_data[last] == ',' {
-		env_data = env_data[:last]
-	}
-	if env_data == "" {
-		env = []string{}
-	}
-	env = append(env, env_data)
+	if len(container.Env) > 0 {
+		log.G(Ctx).Info("-- Appending envs")
+		env := make([]string, 1)
+		env = append(env, "--env")
+		env_data := ""
+		for _, env_var := range container.Env {
+			tmp := (env_var.Name + "=" + env_var.Value + ",")
+			env_data += tmp
+		}
+		if last := len(env_data) - 1; last >= 0 && env_data[last] == ',' {
+			env_data = env_data[:last]
+		}
+		if env_data == "" {
+			env = []string{}
+		}
+		env = append(env, env_data)
 
-	return env
+		return env
+	} else {
+		return []string{}
+	}
 }
 
 func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([]string, error) {
@@ -229,7 +233,7 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 	stringToBeWritten += sbatch_macros
 
 	for _, singularityCommand := range commands {
-		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " >> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out 2>> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".err; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
+		stringToBeWritten += "\n" + strings.Join(singularityCommand.command[:], " ") + " &> " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".out; echo $? > " + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "_" + singularityCommand.containerName + ".status &"
 	}
 
 	stringToBeWritten += "\n" + postfix

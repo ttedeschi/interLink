@@ -45,18 +45,14 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
 		return
 	} else {
-		JIDs = append(JIDs, JidStruct{PodUID: "58b735d3-3973-4474-bdda-949978cd13a3", JID: "123456"})
-		for _, jid := range JIDs {
-			if jid.PodUID == req.PodUID {
-				cmd = OSexec.Command("cat", "slurm-"+jid.JID+".out")
-			}
-		}
+		log.G(Ctx).Info("Reading  .tmp/" + req.PodUID + "_" + req.ContainerName + ".out")
+		cmd = OSexec.Command("cat", ".tmp/"+req.PodUID+"_"+req.ContainerName+".out")
 	}
 
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		log.G(Ctx).Error(err)
+		log.G(Ctx).Info(string(output))
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		return

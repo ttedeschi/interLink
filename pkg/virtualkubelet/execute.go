@@ -130,6 +130,44 @@ func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
 	return returnValue, nil
 }
 
+func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest commonIL.LogStruct) (io.ReadCloser, error) {
+	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
+	if err != nil {
+		log.G(ctx).Fatal(err)
+	}
+	token := string(b)
+
+	bodyBytes, err := json.Marshal(logsRequest)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return nil, err
+	}
+	reader := bytes.NewReader(bodyBytes)
+	req, err := http.NewRequest(http.MethodGet, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/getLogs", reader)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return nil, err
+	}
+
+	log.G(ctx).Println(string(bodyBytes))
+
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.G(ctx).Error(err)
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.G(ctx).Info(resp.Body)
+		return nil, errors.New("Unexpected error occured while getting logs. Status code: " + strconv.Itoa(resp.StatusCode) + ". Check InterLink's logs for further informations")
+	} else {
+		return resp.Body, nil
+	}
+
+}
+
 func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, imageLocation string, pod *v1.Pod) error {
 	var req []*v1.Pod
 	req = []*v1.Pod{pod}
@@ -150,7 +188,6 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 		}
 		log.G(ctx).Info(string(returnVal))
 		break
-
 	case DELETE:
 		returnVal, err := deleteRequest(req, token)
 		if err != nil {
