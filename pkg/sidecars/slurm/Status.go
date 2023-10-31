@@ -2,9 +2,12 @@ package slurm
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +16,7 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +78,39 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(statusCode)
 						w.Write([]byte("Error executing Squeue. Check Slurm Sidecar's logs"))
 						log.G(Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
-						return
+						containerStatuses := []v1.ContainerStatus{}
+						for _, ct := range pod.Spec.Containers {
+							log.G(Ctx).Info("Getting exit status from  .tmp/" + pod.UID + "_" + types.UID(ct.Name) + ".status")
+							file, err := os.Open(".tmp/" + string(pod.UID) + "_" + ct.Name + ".status")
+							if err != nil {
+								log.G(Ctx).Error(fmt.Errorf("unable to retrieve container status: %s", err))
+							}
+							defer file.Close()
+							statusb, err := io.ReadAll(file)
+							if err != nil {
+								log.G(Ctx).Error(fmt.Errorf("unable to read container status: %s", err))
+							}
+							status, err := strconv.Atoi(string(statusb))
+							if err != nil {
+								log.G(Ctx).Error(fmt.Errorf("unable to convert container status: %s", err))
+							}
+
+							containerStatuses = append(
+								containerStatuses,
+								v1.ContainerStatus{
+									Name: ct.Name,
+									State: v1.ContainerState{
+										Terminated: &v1.ContainerStateTerminated{
+											ExitCode: int32(status),
+										},
+									},
+									Ready: false,
+								},
+							)
+
+						}
+
+						resp = append(resp, commonIL.PodStatus{PodName: pod.Name, PodNamespace: pod.Namespace, Containers: containerStatuses})
 					} else {
 						pattern := `(CD|CG|F|PD|PR|R|S|ST)`
 						re := regexp.MustCompile(pattern)

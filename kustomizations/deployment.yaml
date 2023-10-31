@@ -36,7 +36,7 @@ spec:
         - debug
         env:
         - name: KUBELET_PORT
-          value: "10250"
+          value: "10255"
         - name: VKUBELET_POD_IP
           valueFrom:
             fieldRef:
