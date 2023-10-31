@@ -597,7 +597,29 @@ func addAttributes(ctx context.Context, span trace.Span, attrs ...string) contex
 }
 
 func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName, containerName string, opts api.ContainerLogOpts) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("NOT IMPLEMENTED YET")
+	var span trace.Span
+	ctx, span = trace.StartSpan(ctx, "GetLogs") //nolint: ineffassign,staticcheck
+	defer span.End()
+
+	// Add namespace and name as attributes to the current span.
+	ctx = addAttributes(ctx, span, NamespaceKey, namespace, NameKey, podName)
+
+	log.G(ctx).Infof("receive GetPodLogs %q", podName)
+
+	key, err := BuildKeyFromNames(namespace, podName)
+	if err != nil {
+		log.G(ctx).Error(err)
+	}
+
+	logsRequest := commonIL.LogStruct{
+		Namespace:     namespace,
+		PodUID:        string(p.pods[key].UID),
+		PodName:       podName,
+		ContainerName: containerName,
+		Opts:          commonIL.ContainerLogOpts(opts),
+	}
+
+	return LogRetrieval(p, ctx, logsRequest)
 }
 
 // GetStatsSummary returns dummy stats for all pods known by this provider.
