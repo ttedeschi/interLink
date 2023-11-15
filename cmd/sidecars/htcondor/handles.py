@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import json
 import os
 import subprocess
@@ -302,14 +302,30 @@ def parse_string_with_suffix(value_str):
 def produce_htcondor_singularity_script(containers, metadata, commands, input_files):
     executable_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.sh"
     sub_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.jdl"
-    requested_cpus = sum([int(c["resources"]["requests"]["cpu"])
-                         for c in containers])
-    requested_memory = sum(
-        [
-            parse_string_with_suffix(c["resources"]["requests"]["memory"])
-            for c in containers
-        ]
-    )
+
+    requested_cpus = 0
+    requested_memory = 0
+    for c in containers:
+        if "resources" in c.keys():
+            if "requests" in c["resources"].keys():
+                if "cpu" in c["resources"]["requests"].keys():
+                    requested_cpus += int(c["resources"]["requests"]["cpu"])
+                if "memory" in c["resources"]["requests"].keys():
+                    requested_memory +=  parse_string_with_suffix(c["resources"]["requests"]["memory"])
+    if requested_cpus == 0:
+        requested_cpus = 1
+    if requested_memory == 0:
+        requested_memory = 1
+
+    #requested_cpus = sum([int(c["resources"]["requests"]["cpu"])
+    #                     for c in containers])
+    #requested_memory = sum(
+    #    [
+    #        parse_string_with_suffix(c["resources"]["requests"]["memory"])
+    #        for c in containers
+    #    ]
+    #)
+
     prefix_ = f"\n{InterLinkConfigInst['CommandPrefix']}"
     try:
         with open(executable_path, "w") as f:
@@ -470,14 +486,15 @@ def SubmitHandler():
             commstr1 = ["singularity", "exec"]
             envs = prepare_envs(container)
             image = ""
+            mounts = [""]
             if containers_standalone is not None:
                 for c in containers_standalone:
                     if c["name"] == container["name"]:
                         container_standalone = c
-                mounts = prepare_mounts(pod, container_standalone)
+                        mounts = prepare_mounts(pod, container_standalone)
             else:
                 mounts = [""]
-            if container["image"].startswith("/"):
+            if container["image"].startswith("/") or ".io" in container["image"]:
                 image_uri = metadata.get("Annotations", {}).get(
                     "htcondor-job.knoc.io/image-root", None
                 )
@@ -504,6 +521,8 @@ def SubmitHandler():
                     + mount.split(":")[1]
                     + ","
                 )
+            if local_mounts[-1] == "":
+                local_mounts = [""]
 
             if "command" in container.keys() and "args" in container.keys():
                 singularity_command = (
@@ -585,12 +604,13 @@ def StatusHandler():
     # ELABORATE RESPONSE #################
     resp = [
         {
-            "Name": [],
-            "Namespace": [],
-            "Status": [],
+            "name": [],
+            "namespace": [],
+            "containers": []
         }
     ]
-    try:
+    if True:
+    #try:
         with open(
             InterLinkConfigInst["DataRootFolder"] +
             req["metadata"]["name"] + ".jid",
@@ -599,29 +619,73 @@ def StatusHandler():
             jid_job = f.read()
         podname = req["metadata"]["name"]
         podnamespace = req["metadata"]["namespace"]
-        resp[0]["Name"] = podname
-        resp[0]["Namespace"] = podnamespace
+        resp[0]["name"] = podname
+        resp[0]["namespace"] = podnamespace
         ok = True
         process = os.popen(f"condor_q {jid_job} --json")
         preprocessed = process.read()
         process.close()
         job_ = json.loads(preprocessed)
         status = job_[0]["JobStatus"]
-        if status != 2 and status != 1:
-            ok = False
-        if ok:
-            resp[0]["Status"] = 0
+        if status == 0:
+            state = {"waiting": {
+                }
+            }
+            readiness = False
+        elif status == 1:
+            state = {"running": {
+                "startedAt": "2006-01-02T15:04:05Z",
+                }
+            }
+            readiness = True
         else:
-            resp[0]["Status"] = 1
+            state = {"terminated": {
+                "startedAt": "2006-01-02T15:04:05Z",
+                "finishedAt": "2006-01-02T15:04:05Z",
+                }
+            }
+            readiness = False
+        for c in req["spec"]["containers"]:
+            resp[0]["containers"].append({
+                "name": c["name"],
+                "state": state,
+                "lastState": {},
+                "ready": readiness,
+                "restartCount": 0,
+                "image": "NOT IMPLEMENTED",
+                "imageID": "NOT IMPLEMENTED"
+                })
+        #if status != 2 and status != 1:
+        #    ok = False
+        #if ok:
+        #    resp[0]["Status"] = 0
+        #else:
+        #    resp[0]["Status"] = 1
         return json.dumps(resp), 200
-    except Exception as e:
-        return f"Something went wrong when retrieving pod status: {e}", 500
+    #except Exception as e:
+    #    return f"Something went wrong when retrieving pod status: {e}", 500
+
+def LogsHandler():
+    logging.info("HTCondor Sidecar: received GetLogs call")
+    request_data_string = request.data.decode("utf-8")
+    print(request_data_string)
+    req = json.loads(request_data_string)
+    if req is None or not isinstance(req, dict):
+        print("Invalid logs request body is: ", req)
+        logging.error("Invalid request data")
+        return "Invalid request data for getting logs", 400
+
+    resp = "NOT IMPLEMENTED"
+
+    return json.dumps(resp), 200
+    #return jsonify(returned_logs), 200
 
 
 app = Flask(__name__)
 app.add_url_rule("/create", view_func=SubmitHandler, methods=["POST"])
 app.add_url_rule("/delete", view_func=StopHandler, methods=["POST"])
 app.add_url_rule("/status", view_func=StatusHandler, methods=["GET"])
+app.add_url_rule("/getLogs", view_func=LogsHandler, methods=["POST"])
 
 if __name__ == "__main__":
     app.run(port=args.port, host="0.0.0.0", debug=True)
