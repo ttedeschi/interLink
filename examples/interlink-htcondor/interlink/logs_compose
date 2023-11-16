@@ -1,0 +1,78 @@
+#1 [interlink-docker-sidecar internal] load .dockerignore
+#1 transferring context: 122B done
+#1 ...
+
+#2 [interlink-interlink internal] load build definition from Dockerfile.interlink
+#2 transferring dockerfile: 488B done
+#2 DONE 4.4s
+
+#3 [interlink-docker-sidecar internal] load build definition from Dockerfile
+#3 transferring dockerfile: 561B done
+#3 ...
+
+#4 [interlink-interlink internal] load .dockerignore
+#4 transferring context: 122B done
+#4 DONE 7.1s
+
+#3 [interlink-docker-sidecar internal] load build definition from Dockerfile
+#3 ...
+
+#5 [interlink-interlink internal] load metadata for docker.io/library/golang:1.21
+#5 ...
+
+#1 [interlink-docker-sidecar internal] load .dockerignore
+#1 DONE 11.8s
+
+#6 [interlink-interlink internal] load metadata for gcr.io/distroless/base-debian11:latest
+#6 ...
+
+#3 [interlink-docker-sidecar internal] load build definition from Dockerfile
+#3 DONE 14.1s
+
+#7 [interlink-docker-sidecar internal] load metadata for docker.io/htcondor/mini:9.0.17-el7
+#7 DONE 0.0s
+
+#8 [interlink-docker-sidecar 1/3] FROM docker.io/htcondor/mini:9.0.17-el7
+#8 DONE 0.0s
+
+#6 [interlink-interlink internal] load metadata for gcr.io/distroless/base-debian11:latest
+#6 ...
+
+#9 [interlink-docker-sidecar 2/3] RUN yum update -y &&     yum install -y epel-release &&     yum update -y &&     yum install -y apptainer
+#9 CACHED
+
+#10 [interlink-docker-sidecar 3/3] RUN mkdir -p /cvmfs/grid.cern.ch/etc/grid-security
+#10 CACHED
+
+#11 [interlink-docker-sidecar] exporting to image
+#11 exporting layers done
+#11 writing image sha256:fe5fc70c9d20c61121af62dc67b094819acbefc53ade4a95e4d81cd608d8b010 0.1s done
+#11 naming to docker.io/library/interlink-docker-sidecar done
+#11 DONE 0.1s
+
+#6 [interlink-interlink internal] load metadata for gcr.io/distroless/base-debian11:latest
+#6 DONE 11.4s
+
+#5 [interlink-interlink internal] load metadata for docker.io/library/golang:1.21
+#5 DONE 12.6s
+
+#12 [interlink-interlink build-stage 1/4] FROM docker.io/library/golang:1.21@sha256:57bf74a970b68b10fe005f17f550554406d9b696d10b29f1a4bdc8cae37fd063
+#12 DONE 0.0s
+
+#13 [interlink-interlink build-release-stage 1/3] FROM gcr.io/distroless/base-debian11:latest@sha256:b31a6e02605827e77b7ebb82a0ac9669ec51091edd62c2c076175e05556f4ab9
+#13 DONE 0.0s
+
+#14 [interlink-interlink internal] load build context
+#14 transferring context: 97B
+#14 transferring context: 721.83kB 0.2s done
+#14 DONE 0.7s
+
+#15 [interlink-interlink build-stage 2/4] WORKDIR /app
+#15 CACHED
+
+#16 [interlink-interlink build-stage 3/4] COPY .. .
+#16 DONE 11.0s
+
+#17 [interlink-interlink build-stage 4/4] RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -o bin/interlink cmd/interlink/main.go
+time="2023-11-16T16:30:56Z" level=error msg="got 3 SIGTERM/SIGINTs, forcing shutdown"
+canceled

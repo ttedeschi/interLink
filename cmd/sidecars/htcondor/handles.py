@@ -123,9 +123,11 @@ def prepare_mounts(pod, container_standalone):
                         mount_data.append(path)
                 elif "secret" in vol.keys():
                     secrets_paths = mountSecrets(pod, container_standalone)
+                    #print("secrets_paths", secrets_paths) 
                     print("bind as secret", mount_var["name"], vol["name"])
                     for i, path in enumerate(secrets_paths):
                         mount_data.append(path)
+                        #print("mount_data:", mount_data)
                 elif "emptyDir" in vol.keys():
                     path = mount_empty_dir(container, pod)
                     mount_data.append(path)
@@ -217,18 +219,28 @@ def mountSecrets(pod, container_standalone):
         cmd = ["-rf", os.path.join(wd, data_root_folder, "secrets")]
         subprocess.run(["rm"] + cmd, check=True)
         for mountSpec in container["volumeMounts"]:
-            print(mountSpec["name"])
+            #print("mountSpec ", mountSpec["name"])
             for vol in pod["spec"]["volumes"]:
+                #print("vol", vol)
                 if vol["name"] != mountSpec["name"]:
+                    #print("rejecting mountSpec", mountSpec["name"], " vol:", vol["name"])
                     continue
+                print("allowing mountSpec", mountSpec["name"], " vol:", vol["name"])
                 if "secret" in vol.keys():
+                    print('vol["secret"]["secretName"]', vol["secret"]["secretName"], 'vol["name"]', vol["name"])
                     secrets = container_standalone["secrets"]
+                    print("SECRETS ARE:", secrets)
+                    print()
+                    print()
+                    print()
                     for secret in secrets:
-                        print(
-                            secret["metadata"]["name"], ":", vol["secret"]["secretName"]
-                        )
+                        #print(
+                        #    secret["metadata"]["name"], ":", vol["secret"]["secretName"]
+                        #)
                         if secret["metadata"]["name"] != vol["secret"]["secretName"]:
+                            print("rejecting mountSpec", secret["metadata"]["name"], " vol:", vol["secret"]["secretName"])
                             continue
+                        print("allowing mountSpec", secret["metadata"]["name"], " vol:", vol["secret"]["secretName"])
                         pod_secret_dir = os.path.join(
                             wd,
                             data_root_folder,
@@ -302,7 +314,7 @@ def parse_string_with_suffix(value_str):
 def produce_htcondor_singularity_script(containers, metadata, commands, input_files):
     executable_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.sh"
     sub_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.jdl"
-
+    
     requested_cpus = 0
     requested_memory = 0
     for c in containers:
@@ -650,10 +662,10 @@ def StatusHandler():
                 "name": c["name"],
                 "state": state,
                 "lastState": {},
-                "ready": readiness,
-                "restartCount": 0,
-                "image": "NOT IMPLEMENTED",
-                "imageID": "NOT IMPLEMENTED"
+		"ready": readiness,
+		"restartCount": 0,
+		"image": "NOT IMPLEMENTED",
+		"imageID": "NOT IMPLEMENTED"
                 })
         #if status != 2 and status != 1:
         #    ok = False

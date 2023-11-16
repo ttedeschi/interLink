@@ -15,12 +15,12 @@ spec:
       readOnly: true
     command:
       - sleep
-      - "10"
+      - "100"
     imagePullPolicy: Always
     name: busyecho1
     resources:
       requests:
-        memory: "3000"
+        #memory: "3000"
         cpu: "1"
   dnsPolicy: ClusterFirst
   nodeSelector:
