@@ -1,6 +1,6 @@
 # SLURM DEMO
 
-## Deploy interlink+SLURM demo locally
+## Deploy interlink+HTCondor demo locally
 
 __N.B.__ in the demo the oauth2 proxy authN/Z is disabled. DO NOT USE THIS IN PRODUCTION unless you know what you are doing.
 
@@ -17,7 +17,7 @@ git clone https://github.com/interTwin-eu/interLink.git
 Move to example location:
 
 ```bash
-cd interLink/examples/interlink-slurm
+cd interLink/examples/interlink-htcondor
 ```
 
 ### Bootstrap a minikube cluster
