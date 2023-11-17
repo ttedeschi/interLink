@@ -28,7 +28,9 @@ minikube start --kubernetes-version=1.24.3
 
 ### Configure interLink
 
-First of all, you need a valid kubeconfig file to be passed to the interLink docker compose. With minikube you will need the following script (check that `PATH_TO_KUBECONFIG` env is pointing to the correct kubeconfig first), otherwise you can simply copy your own there.
+First of all, you need a valid kubeconfig file to be passed to the interLink docker compose. With minikube you will
+need the following script (check that `PATH_TO_KUBECONFIG` env is pointing to the correct kubeconfig first), 
+otherwise you can simply copy your own there.
 
 __N.B.__ the kubeconfig file should be a stand-alone one. So the certificate data should be loaded as strings not as path.
 

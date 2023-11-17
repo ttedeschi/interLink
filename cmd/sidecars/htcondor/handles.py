@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 import json
 import os
 import subprocess
@@ -26,7 +26,7 @@ parser.add_argument("--proxy", help="Path to proxy file", type=str, default="")
 parser.add_argument(
     "--dummy-job",
     action="store_true",
-    help="Whether the job should be a real job or a dummy sleep job for debugging purposes",
+    help="Whether the job should be a real job or a dummy sleep job",
 )
 parser.add_argument("--port", help="Server port", type=int, default=8000)
 
@@ -118,16 +118,14 @@ def prepare_mounts(pod, container_standalone):
                 if "configMap" in vol.keys():
                     config_maps_paths = mountConfigMaps(
                         pod, container_standalone)
-                    print("bind as configmap", mount_var["name"], vol["name"])
+                    # print("bind as configmap", mount_var["name"], vol["name"])
                     for i, path in enumerate(config_maps_paths):
                         mount_data.append(path)
                 elif "secret" in vol.keys():
                     secrets_paths = mountSecrets(pod, container_standalone)
-                    #print("secrets_paths", secrets_paths) 
-                    print("bind as secret", mount_var["name"], vol["name"])
+                    # print("bind as secret", mount_var["name"], vol["name"])
                     for i, path in enumerate(secrets_paths):
                         mount_data.append(path)
-                        #print("mount_data:", mount_data)
                 elif "emptyDir" in vol.keys():
                     path = mount_empty_dir(container, pod)
                     mount_data.append(path)
@@ -219,28 +217,14 @@ def mountSecrets(pod, container_standalone):
         cmd = ["-rf", os.path.join(wd, data_root_folder, "secrets")]
         subprocess.run(["rm"] + cmd, check=True)
         for mountSpec in container["volumeMounts"]:
-            #print("mountSpec ", mountSpec["name"])
             for vol in pod["spec"]["volumes"]:
-                #print("vol", vol)
                 if vol["name"] != mountSpec["name"]:
-                    #print("rejecting mountSpec", mountSpec["name"], " vol:", vol["name"])
                     continue
-                print("allowing mountSpec", mountSpec["name"], " vol:", vol["name"])
                 if "secret" in vol.keys():
-                    print('vol["secret"]["secretName"]', vol["secret"]["secretName"], 'vol["name"]', vol["name"])
                     secrets = container_standalone["secrets"]
-                    print("SECRETS ARE:", secrets)
-                    print()
-                    print()
-                    print()
                     for secret in secrets:
-                        #print(
-                        #    secret["metadata"]["name"], ":", vol["secret"]["secretName"]
-                        #)
                         if secret["metadata"]["name"] != vol["secret"]["secretName"]:
-                            print("rejecting mountSpec", secret["metadata"]["name"], " vol:", vol["secret"]["secretName"])
                             continue
-                        print("allowing mountSpec", secret["metadata"]["name"], " vol:", vol["secret"]["secretName"])
                         pod_secret_dir = os.path.join(
                             wd,
                             data_root_folder,
@@ -314,7 +298,7 @@ def parse_string_with_suffix(value_str):
 def produce_htcondor_singularity_script(containers, metadata, commands, input_files):
     executable_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.sh"
     sub_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.jdl"
-    
+
     requested_cpus = 0
     requested_memory = 0
     for c in containers:
@@ -323,20 +307,12 @@ def produce_htcondor_singularity_script(containers, metadata, commands, input_fi
                 if "cpu" in c["resources"]["requests"].keys():
                     requested_cpus += int(c["resources"]["requests"]["cpu"])
                 if "memory" in c["resources"]["requests"].keys():
-                    requested_memory +=  parse_string_with_suffix(c["resources"]["requests"]["memory"])
+                    requested_memory += parse_string_with_suffix(
+                        c["resources"]["requests"]["memory"])
     if requested_cpus == 0:
         requested_cpus = 1
     if requested_memory == 0:
         requested_memory = 1
-
-    #requested_cpus = sum([int(c["resources"]["requests"]["cpu"])
-    #                     for c in containers])
-    #requested_memory = sum(
-    #    [
-    #        parse_string_with_suffix(c["resources"]["requests"]["memory"])
-    #        for c in containers
-    #    ]
-    #)
 
     prefix_ = f"\n{InterLinkConfigInst['CommandPrefix']}"
     try:
@@ -466,7 +442,6 @@ def handle_jid(jid, pod):
         )
     else:
         logging.info("Job submission failed, couldn't retrieve JID")
-        # return "Job submission failed, couldn't retrieve JID", 500
 
 
 def SubmitHandler():
@@ -482,9 +457,9 @@ def SubmitHandler():
 
     # ELABORATE RESPONSE ###########
     pod = req.get("pod", {})
-    print(pod)
+    # print(pod)
     containers_standalone = req.get("container", {})
-    print("Requested pod metadata name is: ", pod["metadata"]["name"])
+    # print("Requested pod metadata name is: ", pod["metadata"]["name"])
     metadata = pod.get("metadata", {})
     containers = pod.get("spec", {}).get("containers", [])
     singularity_commands = []
@@ -621,8 +596,7 @@ def StatusHandler():
             "containers": []
         }
     ]
-    if True:
-    #try:
+    try:
         with open(
             InterLinkConfigInst["DataRootFolder"] +
             req["metadata"]["name"] + ".jid",
@@ -633,7 +607,6 @@ def StatusHandler():
         podnamespace = req["metadata"]["namespace"]
         resp[0]["name"] = podname
         resp[0]["namespace"] = podnamespace
-        ok = True
         process = os.popen(f"condor_q {jid_job} --json")
         preprocessed = process.read()
         process.close()
@@ -641,20 +614,20 @@ def StatusHandler():
         status = job_[0]["JobStatus"]
         if status == 0:
             state = {"waiting": {
-                }
+            }
             }
             readiness = False
         elif status == 1:
             state = {"running": {
                 "startedAt": "2006-01-02T15:04:05Z",
-                }
+            }
             }
             readiness = True
         else:
             state = {"terminated": {
                 "startedAt": "2006-01-02T15:04:05Z",
                 "finishedAt": "2006-01-02T15:04:05Z",
-                }
+            }
             }
             readiness = False
         for c in req["spec"]["containers"]:
@@ -662,25 +635,20 @@ def StatusHandler():
                 "name": c["name"],
                 "state": state,
                 "lastState": {},
-		"ready": readiness,
-		"restartCount": 0,
-		"image": "NOT IMPLEMENTED",
-		"imageID": "NOT IMPLEMENTED"
-                })
-        #if status != 2 and status != 1:
-        #    ok = False
-        #if ok:
-        #    resp[0]["Status"] = 0
-        #else:
-        #    resp[0]["Status"] = 1
+                "ready": readiness,
+                "restartCount": 0,
+                "image": "NOT IMPLEMENTED",
+                "imageID": "NOT IMPLEMENTED"
+            })
         return json.dumps(resp), 200
-    #except Exception as e:
-    #    return f"Something went wrong when retrieving pod status: {e}", 500
+    except Exception as e:
+        return f"Something went wrong when retrieving pod status: {e}", 500
+
 
 def LogsHandler():
     logging.info("HTCondor Sidecar: received GetLogs call")
     request_data_string = request.data.decode("utf-8")
-    print(request_data_string)
+    # print(request_data_string)
     req = json.loads(request_data_string)
     if req is None or not isinstance(req, dict):
         print("Invalid logs request body is: ", req)
@@ -690,7 +658,6 @@ def LogsHandler():
     resp = "NOT IMPLEMENTED"
 
     return json.dumps(resp), 200
-    #return jsonify(returned_logs), 200
 
 
 app = Flask(__name__)
@@ -701,3 +668,4 @@ app.add_url_rule("/getLogs", view_func=LogsHandler, methods=["POST"])
 
 if __name__ == "__main__":
     app.run(port=args.port, host="0.0.0.0", debug=True)
+
