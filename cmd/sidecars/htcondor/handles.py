@@ -612,12 +612,12 @@ def StatusHandler():
         process.close()
         job_ = json.loads(preprocessed)
         status = job_[0]["JobStatus"]
-        if status == 0:
+        if status == 1:
             state = {"waiting": {
             }
             }
             readiness = False
-        elif status == 1:
+        elif status == 2:
             state = {"running": {
                 "startedAt": "2006-01-02T15:04:05Z",
             }
