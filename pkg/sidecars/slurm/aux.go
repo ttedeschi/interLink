@@ -28,7 +28,7 @@ var timer time.Time
 var cachedStatus []commonIL.PodStatus
 
 type JidStruct struct {
-	PodUID    string    `json:"PodName"`
+	PodUID    string    `json:"PodUID"`
 	JID       string    `json:"JID"`
 	StartTime time.Time `json:"StartTime"`
 	EndTime   time.Time `json:"EndTime"`
@@ -37,6 +37,99 @@ type JidStruct struct {
 type SingularityCommand struct {
 	containerName string
 	command       []string
+}
+
+func parsingTimeFromString(stringTime string) (time.Time, error) {
+	parsedTime := time.Time{}
+	timestampFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+	parts := strings.Fields(stringTime)
+	if len(parts) != 4 {
+		err := errors.New("Invalid timestamp format")
+		log.G(Ctx).Error(err)
+		return time.Time{}, err
+	}
+
+	parsedTime, err := time.Parse(timestampFormat, stringTime)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return time.Time{}, err
+	}
+
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return time.Time{}, err
+	}
+
+	return parsedTime, nil
+}
+
+func CreateDirectories() error {
+	path := commonIL.InterLinkConfigInst.DataRootFolder
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(path, os.ModePerm)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func Load_JIDs() error {
+	path := commonIL.InterLinkConfigInst.DataRootFolder
+
+	dir, err := os.Open(path)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return err
+	}
+	defer dir.Close()
+
+	entries, err := dir.ReadDir(0)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			podUID := entry.Name()
+			StartedAt := time.Time{}
+			FinishedAt := time.Time{}
+			JID, err := os.ReadFile(path + entry.Name() + "/" + "JobID.jid")
+			if err != nil {
+				log.G(Ctx).Error(err)
+				return err
+			}
+
+			StartedAtString, err := os.ReadFile(path + entry.Name() + "/" + "StartedAt.time")
+			if err != nil {
+				log.G(Ctx).Debug(err)
+			} else {
+				StartedAt, err = parsingTimeFromString(string(StartedAtString))
+				if err != nil {
+					log.G(Ctx).Debug(err)
+				}
+			}
+
+			FinishedAtString, err := os.ReadFile(path + entry.Name() + "/" + "FinishedAt.time")
+			if err != nil {
+				log.G(Ctx).Debug(err)
+			} else {
+				FinishedAt, err = parsingTimeFromString(string(FinishedAtString))
+				if err != nil {
+					log.G(Ctx).Debug(err)
+				}
+			}
+
+			JIDs = append(JIDs, JidStruct{PodUID: podUID, JID: string(JID), StartTime: StartedAt, EndTime: FinishedAt})
+		}
+	}
+
+	log.G(Ctx).Debug(JIDs)
+
+	return nil
 }
 
 func prepare_envs(container v1.Container) []string {
@@ -68,21 +161,16 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 	mount := make([]string, 1)
 	mount = append(mount, "--bind")
 	mount_data := ""
-	pod_name := strings.Split(container.Name, "-")
-
-	if len(pod_name) > 6 {
-		pod_name = pod_name[0:6]
-	}
-
-	err := os.MkdirAll(commonIL.InterLinkConfigInst.DataRootFolder+strings.Join(pod_name[:len(pod_name)-1], "-"), os.ModePerm)
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return nil, err
-	} else {
-		log.G(Ctx).Info("-- Created directory " + commonIL.InterLinkConfigInst.DataRootFolder + strings.Join(pod_name[:len(pod_name)-1], "-"))
-	}
 
 	for _, podData := range data {
+		err := os.MkdirAll(commonIL.InterLinkConfigInst.DataRootFolder+string(podData.Pod.UID), os.ModePerm)
+		if err != nil {
+			log.G(Ctx).Error(err)
+			return nil, err
+		} else {
+			log.G(Ctx).Info("-- Created directory " + commonIL.InterLinkConfigInst.DataRootFolder + string(podData.Pod.UID))
+		}
+
 		for _, cont := range podData.Containers {
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
@@ -98,6 +186,7 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 							splitDirs := strings.Split(dirs[0], "/")
 							dir := filepath.Join(splitDirs[:len(splitDirs)-1]...)
 							prefix += "\nmkdir -p " + dir + " && touch " + dirs[0] + " && echo $" + envs[i] + " > " + dirs[0]
+							mount_data += dir
 						} else {
 							mount_data += path
 						}
@@ -118,6 +207,7 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 							splitDirs := strings.Split(dirs[0], "/")
 							dir := filepath.Join(splitDirs[:len(splitDirs)-1]...)
 							prefix += "\nmkdir -p " + dir + " && touch " + dirs[0] + " && echo $" + envs[i] + " > " + dirs[0]
+							mount_data += dir
 						} else {
 							mount_data += path
 						}
@@ -140,11 +230,14 @@ func prepare_mounts(container v1.Container, data []commonIL.RetrievedPodData) ([
 		}
 	}
 
-	path_hardcoded := ("/cvmfs/grid.cern.ch/etc/grid-security:/etc/grid-security" + "," +
-		"/cvmfs:/cvmfs" + ",")
-	mount_data += path_hardcoded
+	//path_hardcoded := ("/cvmfs/grid.cern.ch/etc/grid-security:/etc/grid-security" + "," +
+	//	"/cvmfs:/cvmfs" + ",")
+	//mount_data += path_hardcoded
 	if last := len(mount_data) - 1; last >= 0 && mount_data[last] == ',' {
 		mount_data = mount_data[:last]
+	}
+	if len(mount_data) == 0 {
+		return []string{}, nil
 	}
 	return append(mount, mount_data), nil
 }
@@ -167,6 +260,15 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 		return "", err
 	}
 	f, err := os.Create(path)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return "", err
+	}
+	err = os.Chmod(path, 0774)
+	if err != nil {
+		log.G(Ctx).Error(err)
+		return "", err
+	}
 	defer f.Close()
 
 	if err != nil {
@@ -225,11 +327,9 @@ func produce_slurm_script(podUID string, metadata metav1.ObjectMeta, commands []
 
 	sbatch_macros := "#!" + commonIL.InterLinkConfigInst.BashPath +
 		"\n#SBATCH --job-name=" + podUID +
+		"\n#SBATCH --output=" + commonIL.InterLinkConfigInst.DataRootFolder + podUID + "/" + "job.out" +
 		sbatch_flags_as_string +
-		"\n. ~/.bash_profile" +
-		//"\nmodule load singularity" +
-		"\nexport SINGULARITYENV_SINGULARITY_TMPDIR=$CINECA_SCRATCH" +
-		"\nexport SINGULARITYENV_SINGULARITY_CACHEDIR=$CINECA_SCRATCH" +
+		"\n" +
 		prefix +
 		"\n"
 
@@ -285,6 +385,8 @@ func slurm_batch_submit(path string) (string, error) {
 }
 
 func handle_jid(podUID string, output string, pod v1.Pod) error {
+	//Submitted batch job 8017236
+	//Submitted batch job 60920
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
 	f, err := os.Create(commonIL.InterLinkConfigInst.DataRootFolder + podUID + "/JobID.jid")
@@ -336,7 +438,8 @@ func delete_container(podUID string) error {
 			return nil
 		}
 	}
-	return errors.New("Unable to find a JID for the provided pod")
+	log.G(Ctx).Error("JID for deletion does not exist anymore")
+	return nil
 }
 
 func mountData(container v1.Container, pod v1.Pod, data interface{}) ([]string, []string, error) {
