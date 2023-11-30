@@ -237,7 +237,7 @@ func main() {
 		//ILbindOld := false
 
 		for {
-			err, _ = commonIL.PingInterLink()
+			err, _ = commonIL.PingInterLink(ctx)
 
 			if err != nil {
 				log.G(ctx).Error(err)

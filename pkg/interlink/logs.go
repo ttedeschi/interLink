@@ -21,6 +21,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		log.G(Ctx).Fatal(err)
 	}
 
+	log.G(Ctx).Info("InterLink: unmarshal GetLogs request")
 	var req2 commonIL.LogStruct //incoming request. To be used in interlink API. req is directly forwarded to sidecar
 	err = json.Unmarshal(bodyBytes, &req2)
 	if err != nil {
@@ -30,6 +31,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.G(Ctx).Info("InterLink: get GetLogs podUID: now ", string(req2.PodUID))
 	pod, err := Clientset.CoreV1().Pods(req2.Namespace).Get(Ctx, req2.PodName, metav1.GetOptions{})
 	if err != nil {
 		statusCode = http.StatusInternalServerError
@@ -39,6 +41,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	req2.PodUID = string(pod.UID)
 
+	log.G(Ctx).Info("InterLink: new GetLogs podUID: now ", string(req2.PodUID))
 	if (req2.Opts.Tail != 0 && req2.Opts.LimitBytes != 0) || (req2.Opts.SinceSeconds != 0 && !req2.Opts.SinceTime.IsZero()) {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
@@ -50,6 +53,8 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		log.G(Ctx).Error(errors.New("Check Opts configurations"))
 		return
 	}
+
+	log.G(Ctx).Info("InterLink: marshal GetLogs request ")
 
 	bodyBytes, err = json.Marshal(req2)
 	if err != nil {

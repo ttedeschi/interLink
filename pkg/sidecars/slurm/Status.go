@@ -73,6 +73,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 					execReturn, _ := shell.Execute()
 					timeNow = time.Now()
 
+					log.G(Ctx).Info("ERR: ", execReturn.Stderr)
 					if execReturn.Stderr != "" {
 						containerStatuses := []v1.ContainerStatus{}
 						for _, ct := range pod.Spec.Containers {

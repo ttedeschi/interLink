@@ -237,16 +237,17 @@ func NewServiceAccount() error {
 	return nil
 }
 
-func PingInterLink() (error, bool) {
+func PingInterLink(ctx context.Context) (error, bool) {
+	log.G(ctx).Info("Pinging: " + InterLinkConfigInst.Interlinkurl + ":" + InterLinkConfigInst.Interlinkport + "/ping")
 	req, err := http.NewRequest(http.MethodPost, InterLinkConfigInst.Interlinkurl+":"+InterLinkConfigInst.Interlinkport+"/ping", nil)
 
 	if err != nil {
-		log.G(context.Background()).Error(err)
+		log.G(ctx).Error(err)
 	}
 
 	token, err := os.ReadFile(InterLinkConfigInst.VKTokenFile) // just pass the file name
 	if err != nil {
-		log.G(context.Background()).Error(err)
+		log.G(ctx).Error(err)
 		return err, false
 	}
 	req.Header.Add("Authorization", "Bearer "+string(token))
@@ -258,7 +259,7 @@ func PingInterLink() (error, bool) {
 	if resp.StatusCode == http.StatusOK {
 		return nil, true
 	} else {
-		log.G(context.Background()).Error("Error " + err.Error() + " " + fmt.Sprint(resp.StatusCode))
+		log.G(ctx).Error("Error " + err.Error() + " " + fmt.Sprint(resp.StatusCode))
 		return nil, false
 	}
 }
