@@ -1,0 +1,52 @@
+version: '3.7'
+services:
+  interlink:
+    build:
+      context: ../../../
+      dockerfile: docker/Dockerfile.interlink
+    restart: always
+    network_mode: "host"
+    volumes:
+    - type: bind
+      source: ../../../cmd/sidecars/htcondor/
+      target: /etc/interlink
+    environment:
+    - INTERLINKCONFIGPATH=/etc/interlink/InterLinkConfig.yaml
+    - KUBECONFIG=/etc/interlink/kubeconfig.yaml
+    # healthcheck:
+    #   test: ["CMD", "/check.sh"]
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 5s
+  docker-sidecar:
+    build:
+      context: ../../../
+      dockerfile: docker/htcondor/Dockerfile
+      #command: /bin/sh -c "python3 handles.py --condor-config /utils/condor_config --schedd-host t2-cce-02.lnl.infn.it --collector-host t2-cce-02.lnl.infn.it:9619 --auth-method GSI --debug D_FULLDEBUG,D_SECURITY --proxy /utils/proxy_daniele_new_new_new"
+    command: /bin/sh -c "python3 handles.py --condor-config /utils/condor_config --schedd-host ce-01.recas.ba.infn.it --collector-host ce-01.recas.ba.infn.it:9619 --auth-method GSI --debug D_FULLDEBUG,D_SECURITY --proxy /utils/proxy_daniele_new_new_new"
+    restart: always
+    privileged: true
+    cap_add:
+    - SYS_ADMIN
+    network_mode: "host"
+    volumes:
+    - type: bind
+      source: ../../../cmd/sidecars/htcondor/
+      target: /utils
+    - type: bind
+      source: ./certificates/
+      target: /etc/grid-security/certificates
+    #environment:
+    #- X509_USER_PROXY=/utils/proxy_daniele_new_new_new
+    #- CONDOR_CONFIG=/utils/condor_config
+    #- _condor_COLLECTOR_HOST=ce-01.recas.ba.infn.it:9619
+    #- _condor_SCHEDD_HOST=ce-01.recas.ba.infn.it
+    #- _condor_TOOL_DEBUG=D_FULLDEBUG,D_SECURITY
+    #- _condor_SEC_DEFAULT_AUTHENTICATION_METHODS=GSI
+    # healthcheck:
+    #   test: ["CMD", "/check.sh"]
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 5s
