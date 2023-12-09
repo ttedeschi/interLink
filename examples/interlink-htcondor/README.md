@@ -82,7 +82,7 @@ kubectl get node
 ```bash
 cd interlink
 
-docker compose -f docker-compose-local.yaml up -d
+docker compose -f docker-compose.yaml up -d
 ```
 
 Check logs for both interLink APIs and HTCondor sidecar:
@@ -96,7 +96,9 @@ docker logs interlink-docker-sidecar-1
 ### Deploy a sample application
 
 ```bash
-kubectl apply -f ../test_pod.yaml 
+kubectl apply -f ../tests/test_configmap.yaml 
+kubectl apply -f ../tests/test_secret.yaml 
+kubectl apply -f ../tests/busyecho.yaml 
 ```
 
 Then observe the application running and eventually succeeding via:
