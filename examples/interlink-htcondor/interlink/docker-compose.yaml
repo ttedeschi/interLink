@@ -13,12 +13,6 @@ services:
     environment:
     - INTERLINKCONFIGPATH=/etc/interlink/InterLinkConfig.yaml
     - KUBECONFIG=/etc/interlink/kubeconfig.yaml
-    # healthcheck:
-    #   test: ["CMD", "/check.sh"]
-    #   interval: 10s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 5s
   docker-sidecar:
     build:
       context: ../../../
@@ -32,9 +26,3 @@ services:
     - type: bind
       source: ../../../cmd/sidecars/htcondor/
       target: /utils
-    # healthcheck:
-    #   test: ["CMD", "/check.sh"]
-    #   interval: 10s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 5s

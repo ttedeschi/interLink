@@ -1,4 +1,4 @@
-# SLURM DEMO
+# HTCondor DEMO
 
 ## Deploy interlink+HTCondor demo locally
 
@@ -82,10 +82,10 @@ kubectl get node
 ```bash
 cd interlink
 
-docker compose up -d
+docker compose -f docker-compose-local.yaml up -d
 ```
 
-Check logs for both interLink APIs and SLURM sidecar:
+Check logs for both interLink APIs and HTCondor sidecar:
 
 ```bash
 docker logs interlink-interlink-1 
@@ -114,13 +114,5 @@ kubectl logs  -n vk test-pod-cfg-cowsay-dciangot
 Also you can see with `squeue --me` the jobs appearing on the `interlink-docker-sidecar-1` container with:
 
 ```bash
-docker exec interlink-docker-sidecar-1 squeue --me
-```
-
-Or, if you need more debug, you can log into the sidecar and look for your POD_UID folder in `.local/interlink/jobs`:
-
-```bash
-docker exec -ti interlink-docker-sidecar-1 bash
-
-ls -altrh .local/interlink/jobs
+docker exec interlink-docker-sidecar-1 condor_q
 ```
