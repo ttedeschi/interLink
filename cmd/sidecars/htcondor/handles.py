@@ -296,8 +296,8 @@ def parse_string_with_suffix(value_str):
 
 
 def produce_htcondor_singularity_script(containers, metadata, commands, input_files):
-    executable_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.sh"
-    sub_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}.jdl"
+    executable_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}-{metadata['uid']}.sh"
+    sub_path = f"./{InterLinkConfigInst['DataRootFolder']}/{metadata['name']}-{metadata['uid']}.jdl"
 
     requested_cpus = 0
     requested_memory = 0
@@ -354,8 +354,8 @@ Queue 1
 
 
 def produce_htcondor_host_script(container, metadata):
-    executable_path = f"{InterLinkConfigInst['DataRootFolder']}{metadata['name']}.sh"
-    sub_path = f"{InterLinkConfigInst['DataRootFolder']}{metadata['name']}.jdl"
+    executable_path = f"{InterLinkConfigInst['DataRootFolder']}{metadata['name']}-{metadata['uid']}.sh"
+    sub_path = f"{InterLinkConfigInst['DataRootFolder']}{metadata['name']}-{metadata['uid']}.jdl"
     try:
         with open(executable_path, "w") as f:
             batch_macros = f"""#!{container['command'][-1]}
@@ -411,7 +411,7 @@ def htcondor_batch_submit(job):
 def delete_pod(pod):
     logging.info(f"Deleting pod {pod['metadata']['name']}")
     with open(
-        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.jid"
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jid"
     ) as f:
         data = f.read()
     jid = int(data.strip())
@@ -420,28 +420,25 @@ def delete_pod(pod):
     process.close()
 
     os.remove(
-        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.jid")
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jid")
     os.remove(
-        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.sh")
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.sh")
     os.remove(
-        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.jdl")
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jdl")
 
     return preprocessed
 
 
 def handle_jid(jid, pod):
-    if True:
-        with open(
-            f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.jid", "w"
-        ) as f:
-            f.write(str(jid))
-        JID.append({"JID": jid, "pod": pod})
-        logging.info(
-            f"Job {jid} submitted successfully",
-            f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}.jid",
-        )
-    else:
-        logging.info("Job submission failed, couldn't retrieve JID")
+    with open(
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jid", "w"
+    ) as f:
+        f.write(str(jid))
+    JID.append({"JID": jid, "pod": pod})
+    logging.info(
+        f"Job {jid} submitted successfully",
+        f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jid",
+    )
 
 
 def SubmitHandler():
@@ -546,7 +543,7 @@ def SubmitHandler():
     try:
         with open(
             InterLinkConfigInst["DataRootFolder"] +
-            pod["metadata"]["name"] + ".jid",
+            pod["metadata"]["name"] + "-" + pod["metadata"]["uid"] + ".jid",
             "r",
         ) as f:
             f.read()
@@ -583,6 +580,7 @@ def StatusHandler():
     logging.info("HTCondor Sidecar: received GetStatus call")
     request_data_string = request.data.decode("utf-8")
     req = json.loads(request_data_string)[0]
+    print(req)
     if req is None or not isinstance(req, dict):
         print("Invalid status request body is: ", req)
         logging.error("Invalid request data")
@@ -592,6 +590,7 @@ def StatusHandler():
     resp = [
         {
             "name": [],
+            "uid": [],
             "namespace": [],
             "containers": []
         }
@@ -599,14 +598,16 @@ def StatusHandler():
     try:
         with open(
             InterLinkConfigInst["DataRootFolder"] +
-            req["metadata"]["name"] + ".jid",
+            req["metadata"]["name"] + "-" + req['metadata']['uid'] + ".jid",
             "r",
         ) as f:
             jid_job = f.read()
         podname = req["metadata"]["name"]
         podnamespace = req["metadata"]["namespace"]
+        poduid = req["metadata"]["uid"]
         resp[0]["name"] = podname
         resp[0]["namespace"] = podnamespace
+        resp[0]["uid"] = poduid
         process = os.popen(f"condor_q {jid_job} --json")
         preprocessed = process.read()
         process.close()
@@ -640,6 +641,7 @@ def StatusHandler():
                 "image": "NOT IMPLEMENTED",
                 "imageID": "NOT IMPLEMENTED"
             })
+        print(json.dumps(resp))
         return json.dumps(resp), 200
     except Exception as e:
         return f"Something went wrong when retrieving pod status: {e}", 500
