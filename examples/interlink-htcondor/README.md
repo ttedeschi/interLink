@@ -113,7 +113,7 @@ When finished, interrupt the watch with `Ctrl+C` and retrieve the logs with:
 kubectl logs  -n vk test-pod-cfg-cowsay-dciangot
 ```
 
-Also you can see with `squeue --me` the jobs appearing on the `interlink-docker-sidecar-1` container with:
+Also you can see with `condor_q` the jobs appearing on the `interlink-docker-sidecar-1` container with:
 
 ```bash
 docker exec interlink-docker-sidecar-1 condor_q
