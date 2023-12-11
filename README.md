@@ -1,8 +1,15 @@
 ![Interlink logo](./docs/imgs/interlink_logo.png)
 
 ## :information_source: Overview
-
-[![Interlink_introduction](https://img.youtube.com/vi/O8wauTVUHfxTpkaC/0.jpg)](https://www.youtube.com/watch?v=O8wauTVUHfxTpkaC)
+<iframe
+    width="640"
+    height="480"
+    src="https://www.youtube.com/embed/O8wauTVUHfxTpkaC"
+    frameborder="0"
+    allow="autoplay; encrypted-media"
+    allowfullscreen
+>
+</iframe>
 
 InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.
 
