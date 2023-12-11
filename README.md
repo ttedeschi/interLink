@@ -1,6 +1,7 @@
 ![Interlink logo](./docs/imgs/interlink_logo.png)
 
 ## :information_source: Overview
+<picture>
 <iframe
     width="640"
     height="480"
@@ -10,6 +11,7 @@
     allowfullscreen
 >
 </iframe>
+</picture>
 
 InterLink aims to provide an abstraction for the execution of a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.
 
