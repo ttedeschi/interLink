@@ -137,6 +137,8 @@ func NewProviderConfig(config VirtualKubeletConfig, nodeName, operatingSystem st
 		onNodeChangeCallback: func(node *v1.Node) {
 			return
 		},
+		//notifier: func(p *v1.Pod) {
+		//		},
 	}
 
 	return &provider, nil

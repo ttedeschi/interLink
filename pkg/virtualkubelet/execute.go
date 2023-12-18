@@ -212,19 +212,25 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 
 				if volume.ConfigMap != nil {
 					_, err = ClientSet.CoreV1().ConfigMaps(pod.Namespace).Get(ctx, volume.ConfigMap.Name, metav1.GetOptions{})
+					if err != nil {
+						log.G(ctx).Warning("Unable to find ConfigMap " + volume.ConfigMap.Name + " for pod " + pod.Name + ". Waiting for it to be initialized")
+					}
 				} else if volume.Secret != nil {
 					_, err = ClientSet.CoreV1().Secrets(pod.Namespace).Get(ctx, volume.Secret.SecretName, metav1.GetOptions{})
+					if err != nil {
+						log.G(ctx).Warning("Unable to find Secret " + volume.Secret.SecretName + " for pod " + pod.Name + ". Waiting for it to be initialized")
+					}
 				}
 			}
 
 			if err != nil {
-				log.G(ctx).Warning("Unable to find a ConfigMap or a Secret for pod " + pod.Name + ". Waiting for it to be initialized")
 				time.Sleep(time.Second)
 				continue
 			} else {
 				break
 			}
 		}
+
 		returnVal, err := createRequest(req, token)
 		if err != nil {
 			log.G(ctx).Error(err)

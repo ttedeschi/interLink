@@ -23,7 +23,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while checking container status. Check Docker Sidecar's logs"))
+		w.Write([]byte("Some errors occurred while checking log requests raw message. Check Docker Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}
@@ -32,7 +32,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while checking container status. Check Docker Sidecar's logs"))
+		w.Write([]byte("Some errors occurred while unmarshalling log request. Check Docker Sidecar's logs"))
 		log.G(Ctx).Error(err)
 		return
 	}

@@ -64,6 +64,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			image = container.Image
 			if strings.HasPrefix(container.Image, "/") {
 				if image_uri, ok := metadata.Annotations["slurm-job.vk.io/image-root"]; ok {
 					image = image_uri + container.Image
@@ -73,7 +74,6 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				image = "docker://" + container.Image
 			}
-			image = container.Image
 
 			log.G(Ctx).Debug("-- Appending all commands together...")
 			singularity_command := append(commstr1, envs...)
