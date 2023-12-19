@@ -90,14 +90,18 @@ type Opts struct {
 }
 
 // NewOpts returns an Opts struct with the default values set.
-func NewOpts(nodename string) *Opts {
+func NewOpts(nodename string, configpath string) *Opts {
 
 	if nodename == "" {
 		nodename = os.Getenv("NODENAME")
 	}
 
+	if configpath == "" {
+		configpath = os.Getenv("CONFIGPATH")
+	}
+
 	return &Opts{
-		ConfigPath: os.Getenv("CONFIGPATH"),
+		ConfigPath: configpath,
 		NodeName:   nodename,
 		Verbose:    commonIL.InterLinkConfigInst.VerboseLogging,
 		ErrorsOnly: commonIL.InterLinkConfigInst.ErrorsOnlyLogging,
@@ -162,8 +166,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	nodename := flag.String("nodename", "", "The name of the node")
+	configpath := flag.String("configpath", "", "Path to the VK config")
 	commonIL.NewInterLinkConfig()
-	opts := NewOpts(*nodename)
+	opts := NewOpts(*nodename, *configpath)
 
 	logger := logrus.StandardLogger()
 	if commonIL.InterLinkConfigInst.VerboseLogging {
@@ -233,24 +238,24 @@ func main() {
 	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx)
 	go func() {
 
-		//ILbindNow := false
-		//ILbindOld := false
+		ILbindNow := false
+		ILbindOld := false
 
 		for {
-			err, _ = commonIL.PingInterLink(ctx)
+			err, ILbindNow = commonIL.PingInterLink(ctx)
 
 			if err != nil {
 				log.G(ctx).Error(err)
 			}
 
-			//if ILbindNow == true && ILbindOld == false {
-			//	err = commonIL.NewServiceAccount()
-			//	if err != nil {
-			//		log.G(ctx).Fatal(err)
-			//	}
-			//}
+			if ILbindNow == true && ILbindOld == false {
+				err = commonIL.NewServiceAccount()
+				if err != nil {
+					log.G(ctx).Fatal(err)
+				}
+			}
 
-			//ILbindOld = ILbindNow
+			ILbindOld = ILbindNow
 			time.Sleep(time.Second * 10)
 
 		}

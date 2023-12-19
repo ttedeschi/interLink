@@ -29,6 +29,7 @@ func NewInterLinkConfig() {
 		var path string
 		verbose := flag.Bool("verbose", false, "Enable or disable Debug level logging")
 		errorsOnly := flag.Bool("errorsonly", false, "Prints only errors if enabled")
+		InterLinkConfigPath := flag.String("interlinkconfigpath", "", "Path to InterLink config")
 		flag.Parse()
 
 		if *verbose {
@@ -39,7 +40,9 @@ func NewInterLinkConfig() {
 			InterLinkConfigInst.ErrorsOnlyLogging = true
 		}
 
-		if os.Getenv("INTERLINKCONFIGPATH") != "" {
+		if *InterLinkConfigPath != "" {
+			path = *InterLinkConfigPath
+		} else if os.Getenv("INTERLINKCONFIGPATH") != "" {
 			path = os.Getenv("INTERLINKCONFIGPATH")
 		} else {
 			path = "/etc/interlink/InterLinkConfig.yaml"
