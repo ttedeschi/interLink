@@ -19,24 +19,6 @@ The project got inspired by the [KNoC](https://github.com/CARV-ICS-FORTH/knoc) p
 ![drawing](docs/imgs/InterLink.svg)
 
 
-## Quick references:
-- [:information\_source: Overview](#information_source-overview)
-  - [Watch for a quick tour](#watch-for-a-quick-tour)
-  - [Introduction](#introduction)
-- [Quick references:](#quick-references)
-- [:fast\_forward: Quick Start](#fast_forward-quick-start)
-- [:information\_source: InterLink Config file](#information_source-interlink-config-file)
-- [:information\_source: Environment Variables list](#information_source-environment-variables-list)
-- [Digging in the project](#digging-in-the-project)
-  - [Virtual Kubelet](#virtual-kubelet)
-  - [InterLink](#interlink)
-  - [Sidecars](#sidecars)
-    - [Docker Sidecar](#docker-sidecar)
-    - [Slurm Sidecar](#slurm-sidecar)
-- [GitHub repository management rules](#github-repository-management-rules)
-  - [Merge management](#merge-management)
-  - [Protection on main branch](#protection-on-main-branch)
-
 ## :fast_forward: Quick Start
 
 Give it a stab at interLink [website](https://dciangot.github.io/interLink/). You will deploy on your laptop a fully emulated instance of a kubernetes cluster able to offload the execution of a pod to a SLURM cluster
