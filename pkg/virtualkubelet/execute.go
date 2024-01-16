@@ -22,10 +22,10 @@ import (
 
 var ClientSet *kubernetes.Clientset
 
-func createRequest(pods commonIL.PodCreateRequests, token string) ([]byte, error) {
+func createRequest(pod commonIL.PodCreateRequests, token string) ([]byte, error) {
 	var returnValue, _ = json.Marshal(commonIL.PodStatus{})
 
-	bodyBytes, err := json.Marshal(pods)
+	bodyBytes, err := json.Marshal(pod)
 	if err != nil {
 		log.L.Error(err)
 		return nil, err
@@ -214,14 +214,18 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 					cfgmap, err := ClientSet.CoreV1().ConfigMaps(pod.Namespace).Get(ctx, volume.ConfigMap.Name, metav1.GetOptions{})
 					if err != nil {
 						log.G(ctx).Warning("Unable to find ConfigMap " + volume.ConfigMap.Name + " for pod " + pod.Name + ". Waiting for it to be initialized")
+						break
+					} else {
+						req.ConfigMaps = append(req.ConfigMaps, *cfgmap)
 					}
-					req.ConfigMaps = append(req.ConfigMaps, *cfgmap)
 				} else if volume.Secret != nil {
 					scrt, err := ClientSet.CoreV1().Secrets(pod.Namespace).Get(ctx, volume.Secret.SecretName, metav1.GetOptions{})
 					if err != nil {
 						log.G(ctx).Warning("Unable to find Secret " + volume.Secret.SecretName + " for pod " + pod.Name + ". Waiting for it to be initialized")
+						break
+					} else {
+						req.Secrets = append(req.Secrets, *scrt)
 					}
-					req.Secrets = append(req.Secrets, *scrt)
 				}
 			}
 

@@ -223,6 +223,7 @@ func main() {
 			log.G(ctx).Fatal(err)
 		}
 	} else {
+		log.G(ctx).Debug("Loading Kubeconfig from " + os.Getenv("KUBECONFIG"))
 		clientCfg, err := clientcmd.NewClientConfigFromBytes(kubecfgFile)
 		if err != nil {
 			log.G(ctx).Fatal(err)
@@ -236,30 +237,33 @@ func main() {
 	localClient := kubernetes.NewForConfigOrDie(kubecfg)
 
 	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx)
-	// go func() {
+	go func() {
 
-	// 	ILbindNow := false
-	// 	// ILbindOld := false
+		ILbind := false
+		retValue := -1
+		counter := 0
 
-	// 	for {
-	// 		err, ILbindNow = commonIL.PingInterLink(ctx)
+		for {
+			err, ILbind, retValue = commonIL.PingInterLink(ctx)
 
-	// 		if err != nil {
-	// 			log.G(ctx).Error(err)
-	// 		}
+			if err != nil {
+				log.G(ctx).Error(err)
+			}
 
-	// 		if ILbindNow == true && ILbindOld == false {
-	// 			err = commonIL.NewServiceAccount()
-	// 			if err != nil {
-	// 				log.G(ctx).Fatal(err)
-	// 			}
-	// 		}
+			if !ILbind && retValue == 1 {
+				counter++
+			} else if ILbind && retValue == 0 {
+				counter = 0
+			}
 
-	// 		ILbindOld = ILbindNow
-	// 		time.Sleep(time.Second * 10)
+			if counter > 10 {
+				log.G(ctx).Fatal("Unable to communicate with the InterLink API, exiting...")
+			}
 
-	// 	}
-	// }()
+			time.Sleep(time.Second * 10)
+
+		}
+	}()
 
 	if err != nil {
 		log.G(ctx).Fatal(err)

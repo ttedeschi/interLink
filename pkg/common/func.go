@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strconv"
 
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/containerd/containerd/log"
-
 	"gopkg.in/yaml.v2"
 )
 
@@ -122,119 +123,9 @@ func NewInterLinkConfig() {
 	}
 }
 
-// func NewServiceAccount() error {
-
-// 	var sa string
-// 	var script string
-// 	path := InterLinkConfigInst.DataRootFolder + ".kube/"
-
-// 	err := os.MkdirAll(path, os.ModePerm)
-// 	if err != nil {
-// 		log.G(context.Background()).Error(err)
-// 		return err
-// 	}
-// 	f, err := os.Create(path + "getSAConfig.sh")
-// 	if err != nil {
-// 		log.G(context.Background()).Error(err)
-// 		return err
-// 	}
-
-// 	defer f.Close()
-
-// 	script = "#!" + InterLinkConfigInst.BashPath + "\n" +
-// 		"SERVICE_ACCOUNT_NAME=" + InterLinkConfigInst.ServiceAccount + "\n" +
-// 		"CONTEXT=$(kubectl config current-context)\n" +
-// 		"NAMESPACE=" + InterLinkConfigInst.Namespace + "\n" +
-// 		"NEW_CONTEXT=" + InterLinkConfigInst.Namespace + "\n" +
-// 		"KUBECONFIG_FILE=\"" + path + "kubeconfig-sa\"\n" +
-// 		"SECRET_NAME=$(kubectl get secret -l kubernetes.io/service-account.name=${SERVICE_ACCOUNT_NAME} --namespace ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}')\n" +
-// 		"TOKEN_DATA=$(kubectl get secret ${SECRET_NAME} --context ${CONTEXT} --namespace ${NAMESPACE} -o jsonpath='{.data.token}')\n" +
-// 		"TOKEN=$(echo ${TOKEN_DATA} | base64 -d)\n" +
-// 		"kubectl config view --raw > ${KUBECONFIG_FILE}.full.tmp\n" +
-// 		"kubectl --kubeconfig ${KUBECONFIG_FILE}.full.tmp config use-context ${CONTEXT}\n" +
-// 		"kubectl --kubeconfig ${KUBECONFIG_FILE}.full.tmp config view --flatten --minify > ${KUBECONFIG_FILE}.tmp\n" +
-// 		"kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp rename-context ${CONTEXT} ${NEW_CONTEXT}\n" +
-// 		"kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp set-credentials ${CONTEXT}-${NAMESPACE}-token-user --token ${TOKEN}\n" +
-// 		"kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp set-context ${NEW_CONTEXT} --user ${CONTEXT}-${NAMESPACE}-token-user\n" +
-// 		"kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp set-context ${NEW_CONTEXT} --namespace ${NAMESPACE}\n" +
-// 		"kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp view --flatten --minify > ${KUBECONFIG_FILE}\n" +
-// 		"rm ${KUBECONFIG_FILE}.full.tmp\n" +
-// 		"rm ${KUBECONFIG_FILE}.tmp"
-
-// 	_, err = f.Write([]byte(script))
-
-// 	if err != nil {
-// 		log.G(context.Background()).Error(err)
-// 		return err
-// 	}
-
-// 	//executing the script to actually retrieve a valid service account
-// 	cmd := []string{path + "getSAConfig.sh"}
-// 	shell := exec.ExecTask{
-// 		Command: "sh",
-// 		Args:    cmd,
-// 		Shell:   true,
-// 	}
-// 	execResult, _ := shell.Execute()
-// 	if execResult.Stderr != "" {
-// 		log.G(context.Background()).Error("Stderr: " + execResult.Stderr + "\nStdout: " + execResult.Stdout)
-// 		return errors.New(execResult.Stderr)
-// 	}
-
-// 	//checking if the config is valid
-// 	_, err = clientcmd.LoadFromFile(path + "kubeconfig-sa")
-// 	if err != nil {
-// 		log.G(context.Background()).Error(err)
-// 		return err
-// 	}
-
-// 	config, err := os.ReadFile(path + "kubeconfig-sa")
-// 	if err != nil {
-// 		log.G(context.Background()).Error(err)
-// 		return err
-// 	}
-
-// 	sa = string(config)
-// 	os.Remove(path + "getSAConfig.sh")
-// 	os.Remove(path + "kubeconfig-sa")
-
-// 	for {
-// 		var returnValue, _ = json.Marshal("Error")
-// 		reader := bytes.NewReader([]byte(sa))
-// 		req, err := http.NewRequest(http.MethodPost, InterLinkConfigInst.Interlinkurl+":"+InterLinkConfigInst.Interlinkport+"/setKubeCFG", reader)
-
-// 		if err != nil {
-// 			log.G(context.Background()).Error(err)
-// 		}
-
-// 		token, err := os.ReadFile(InterLinkConfigInst.VKTokenFile) // just pass the file name
-// 		if err != nil {
-// 			log.G(context.Background()).Error(err)
-// 			return err
-// 		}
-// 		req.Header.Add("Authorization", "Bearer "+string(token))
-// 		resp, err := http.DefaultClient.Do(req)
-// 		if err != nil {
-// 			log.G(context.Background()).Error(err)
-// 			time.Sleep(5 * time.Second)
-// 			continue
-// 		} else {
-
-// 			returnValue, _ = io.ReadAll(resp.Body)
-// 		}
-
-// 		if resp.StatusCode == http.StatusOK {
-// 			break
-// 		} else {
-// 			log.G(context.Background()).Error("Error " + err.Error() + " " + string(returnValue))
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-func PingInterLink(ctx context.Context) (error, bool) {
+func PingInterLink(ctx context.Context) (error, bool, int) {
 	log.G(ctx).Info("Pinging: " + InterLinkConfigInst.Interlinkurl + ":" + InterLinkConfigInst.Interlinkport + "/ping")
+	retVal := -1
 	req, err := http.NewRequest(http.MethodPost, InterLinkConfigInst.Interlinkurl+":"+InterLinkConfigInst.Interlinkport+"/ping", nil)
 
 	if err != nil {
@@ -244,18 +135,28 @@ func PingInterLink(ctx context.Context) (error, bool) {
 	token, err := os.ReadFile(InterLinkConfigInst.VKTokenFile) // just pass the file name
 	if err != nil {
 		log.G(ctx).Error(err)
-		return err, false
+		return err, false, retVal
 	}
 	req.Header.Add("Authorization", "Bearer "+string(token))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err, false
+		return err, false, retVal
 	}
 
 	if resp.StatusCode == http.StatusOK {
-		return nil, true
+		retBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return err, false, retVal
+		}
+		retVal, err = strconv.Atoi(string(retBytes))
+		if err != nil {
+			log.G(ctx).Error(err)
+			return err, false, retVal
+		}
+		return nil, true, retVal
 	} else {
 		log.G(ctx).Error("Error " + err.Error() + " " + fmt.Sprint(resp.StatusCode))
-		return nil, false
+		return nil, false, retVal
 	}
 }

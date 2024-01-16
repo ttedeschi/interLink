@@ -2,19 +2,20 @@ package interlink
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/containerd/containerd/log"
 )
 
 func Ping(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("InterLink: received Ping call")
-	// kubeconfig, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	// if err != nil {
-	// 	log.G(Ctx).Error("Unable to create a valid clientset config")
-	// }
-	// Clientset, err = kubernetes.NewForConfig(kubeconfig)
-	// if err != nil {
-	// 	log.G(Ctx).Error("Unable to set up a clientset")
-	// }
 	w.WriteHeader(http.StatusOK)
+
+	// 0 = KUBECONFIG already set
+	// 1 = KUBECONFIG not set
+	if os.Getenv("KUBECONFIG") != "" {
+		w.Write([]byte("0"))
+	} else {
+		w.Write([]byte("1"))
+	}
 }

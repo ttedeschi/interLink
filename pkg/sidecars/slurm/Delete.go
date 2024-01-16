@@ -24,8 +24,8 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req []*v1.Pod
-	err = json.Unmarshal(bodyBytes, &req)
+	var pod *v1.Pod
+	err = json.Unmarshal(bodyBytes, &pod)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
@@ -34,24 +34,25 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, pod := range req {
-		err = delete_container(string(pod.UID))
-		if err != nil {
-			statusCode = http.StatusInternalServerError
-			w.WriteHeader(statusCode)
-			w.Write([]byte("Error deleting containers. Check Slurm Sidecar's logs"))
-			log.G(Ctx).Error(err)
-			return
-		}
-		if os.Getenv("SHARED_FS") != "true" {
-			err = os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID))
-		}
+	filesPath := commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
+
+	err = delete_container(string(pod.UID), filesPath+"/"+pod.Namespace)
+	if err != nil {
+		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
+		w.Write([]byte("Error deleting containers. Check Slurm Sidecar's logs"))
+		log.G(Ctx).Error(err)
+		return
+	}
+	if os.Getenv("SHARED_FS") != "true" {
+		err = os.RemoveAll(filesPath)
 	}
 
 	w.WriteHeader(statusCode)
 	if statusCode != http.StatusOK {
 		w.Write([]byte("Some errors occurred deleting containers. Check Slurm Sidecar's logs"))
 	} else {
+
 		w.Write([]byte("All containers for submitted Pods have been deleted"))
 	}
 }
