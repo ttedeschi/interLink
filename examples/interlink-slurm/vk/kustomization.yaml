@@ -10,7 +10,4 @@ configMapGenerator:
       - vk-cfg.json=vk-cfg.json
   - name: vk-config 
     files:
-      - InterLinkConfig.yaml=InterLinkConfig.yaml 
-  - name: vk-kubeconfig 
-    files:
-      - kubeconfig.yaml=kubeconfig.yaml 
+      - InterLinkConfig.yaml=InterLinkConfig.yaml
