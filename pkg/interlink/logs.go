@@ -10,7 +10,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
@@ -30,16 +29,6 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		log.G(Ctx).Error(err)
 		return
 	}
-
-	log.G(Ctx).Info("InterLink: get GetLogs podUID: now ", string(req2.PodUID))
-	pod, err := Clientset.CoreV1().Pods(req2.Namespace).Get(Ctx, req2.PodName, metav1.GetOptions{})
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		log.G(Ctx).Error(err)
-		return
-	}
-	req2.PodUID = string(pod.UID)
 
 	log.G(Ctx).Info("InterLink: new GetLogs podUID: now ", string(req2.PodUID))
 	if (req2.Opts.Tail != 0 && req2.Opts.LimitBytes != 0) || (req2.Opts.SinceSeconds != 0 && !req2.Opts.SinceTime.IsZero()) {
