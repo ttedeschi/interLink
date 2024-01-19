@@ -21,7 +21,7 @@ The project got inspired by the [KNoC](https://github.com/CARV-ICS-FORTH/knoc) p
 
 ## :fast_forward: Quick Start
 
-Give it a stab at interLink [website](https://dciangot.github.io/interLink/). You will deploy on your laptop a fully emulated instance of a kubernetes cluster able to offload the execution of a pod to a SLURM cluster
+Give it a stab at interLink [website](https://intertwin-eu.github.io/interLink/). You will deploy on your laptop a fully emulated instance of a kubernetes cluster able to offload the execution of a pod to a SLURM cluster
 
 ## GitHub repository management rules
 
