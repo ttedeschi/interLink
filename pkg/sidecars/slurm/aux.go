@@ -421,7 +421,12 @@ func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig
 		log.G(Ctx).Warning(err)
 		return err
 	}
-	return nil
+	os.RemoveAll(path + "/" + podUID)
+	removeJID(podUID)
+	if err != nil {
+		log.G(Ctx).Warning(err)
+	}
+	return err
 }
 
 func mountData(path string, container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig, Ctx context.Context) ([]string, []string, error) {

@@ -41,12 +41,13 @@ func main() {
 	}
 
 	mutex := http.NewServeMux()
-	mutex.HandleFunc("/status", interLinkAPIs.StatusHandler)
-	mutex.HandleFunc("/create", interLinkAPIs.CreateHandler)
-	mutex.HandleFunc("/delete", interLinkAPIs.DeleteHandler)
-	mutex.HandleFunc("/ping", interLinkAPIs.Ping)
-	mutex.HandleFunc("/getLogs", interLinkAPIs.GetLogsHandler)
-	err = http.ListenAndServe(":"+interLinkConfig.Interlinkport, mutex)
+	mutex.HandleFunc("/status", interlink.StatusHandler)
+	mutex.HandleFunc("/create", interlink.CreateHandler)
+	mutex.HandleFunc("/delete", interlink.DeleteHandler)
+	mutex.HandleFunc("/ping", interlink.Ping)
+	mutex.HandleFunc("/getLogs", interlink.GetLogsHandler)
+	mutex.HandleFunc("/updateCache", interlink.UpdateCacheHandler)
+	err := http.ListenAndServe(":"+commonIL.InterLinkConfigInst.Interlinkport, mutex)
 	if err != nil {
 		log.G(interlink.Ctx).Fatal(err)
 	}
