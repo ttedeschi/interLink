@@ -28,6 +28,9 @@ Move to example location:
 
 ```bash
 cd interLink/examples/interlink-docker
+
+mkdir -p interlink/config
+cp vk/InterLinkConfig.yaml interlink/config/InterLinkConfig.yaml
 ```
 
 ### Setup Kubernetes cluster
