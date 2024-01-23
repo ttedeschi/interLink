@@ -6,7 +6,11 @@ toc_max_heading_level: 5
 
 # Quick-start: local environment
 
+:::danger
 
+__N.B.__ in the demo the oauth2 proxy authN/Z is disabled. DO NOT USE THIS IN PRODUCTION unless you know what you are doing.
+
+:::
 
 ## Requirements
 
@@ -23,17 +27,10 @@ git clone https://github.com/interTwin-eu/interLink.git
 Move to example location:
 
 ```bash
-cd interLink/examples/interlink-slurm
+cd interLink/examples/interlink-docker
 ```
 
 ### Setup Kubernetes cluster
-
-:::danger
-
-__N.B.__ in the demo the oauth2 proxy authN/Z is disabled. DO NOT USE THIS IN PRODUCTION unless you know what you are doing.
-
-:::
-#### Bootstrap a minikube cluster
 
 ```bash
 minikube start --kubernetes-version=1.24.3
