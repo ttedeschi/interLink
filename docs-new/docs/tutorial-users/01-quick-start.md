@@ -6,7 +6,7 @@ toc_max_heading_level: 5
 
 # Quick-start: local environment
 
-Let's connect a cluster to a SLURM batch:
+
 
 ## Requirements
 
@@ -18,7 +18,63 @@ Let's connect a cluster to a SLURM batch:
 git clone https://github.com/interTwin-eu/interLink.git
 ```
 
+## Connect a remote machine with Docker 
+
 Move to example location:
+
+```bash
+cd interLink/examples/interlink-docker
+```
+
+### Bootstrap a minikube cluster
+
+```bash
+minikube start --kubernetes-version=1.24.3
+```
+
+### Configure interLink
+
+You need to provide the interLink IP address that should be reachable from the kubernetes pods. In case of this demo setup, that address __is the address of your machine__
+
+```bash
+export INTERLINK_IP_ADDRESS=XXX.XX.X.XXX
+
+sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  interlink/config/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' interlink/config/InterLinkConfig.yaml
+
+sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  vk/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' vk/InterLinkConfig.yaml
+```
+
+### Deploy virtualKubelet
+
+Create the `vk` namespace:
+
+```bash
+kubectl create ns vk
+```
+
+Deploy the vk resources on the cluster with:
+
+```bash
+kubectl apply -n vk -k vk/
+```
+
+Check that both the pods and the node are in ready status
+
+```bash
+kubectl get pod -n vk
+
+kubectl get node
+```
+
+### Deploy interLink via docker compose
+
+```bash
+cd interlink
+```
+
+## Connect a SLURM batch system
+
+Let's connect a cluster to a SLURM batch. Move to example location:
 
 ```bash
 cd interLink/examples/interlink-slurm

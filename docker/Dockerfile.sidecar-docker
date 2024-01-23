@@ -1,4 +1,4 @@
-FROM golang:1.19 as build-stage
+FROM golang:1.21 as build-stage
 
 WORKDIR /app
 COPY .. .
@@ -25,7 +25,6 @@ RUN echo -e '#!/bin/bash\ndockerd-entrypoint.sh & /sidecar/docker-sidecar' > /si
 RUN chmod +x /sidecar/startup-docker.sh
 RUN chmod -R 777 /sidecar
 
-COPY ../kustomizations/InterLinkConfig.yaml .
 ENV INTERLINKCONFIGPATH=/InterLinkConfig.yaml
 
 USER 1000:1000
