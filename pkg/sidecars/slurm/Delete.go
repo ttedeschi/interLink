@@ -7,11 +7,10 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/log"
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 )
 
-func StopHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) StopHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Slurm Sidecar: received Stop call")
 	statusCode := http.StatusOK
 
@@ -34,9 +33,9 @@ func StopHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filesPath := commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
+	filesPath := h.Config.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
 
-	err = delete_container(string(pod.UID), filesPath+"/"+pod.Namespace)
+	err = deleteContainer(string(pod.UID), filesPath+"/"+pod.Namespace, h.Config)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)

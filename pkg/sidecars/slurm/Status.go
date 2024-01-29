@@ -13,12 +13,13 @@ import (
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	var req []*v1.Pod
 	var resp []commonIL.PodStatus
 	statusCode := http.StatusOK
@@ -36,7 +37,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	if timeNow.Sub(timer) >= time.Second*10 {
 
-		json.Unmarshal(bodyBytes, &req)
+		err = json.Unmarshal(bodyBytes, &req)
 		if err != nil {
 			statusCode = http.StatusInternalServerError
 			w.WriteHeader(statusCode)
@@ -63,11 +64,11 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 		for _, pod := range req {
 			uid := string(pod.UID)
-			path := commonIL.InterLinkConfigInst.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
+			path := h.Config.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
 
 			cmd := []string{"--noheader", "-a", "-j " + JIDs[uid].JID}
 			shell := exec.ExecTask{
-				Command: commonIL.InterLinkConfigInst.Squeuepath,
+				Command: h.Config.Squeuepath,
 				Args:    cmd,
 				Shell:   true,
 			}

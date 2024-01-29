@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func SubmitHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Slurm Sidecar: received Submit call")
 	statusCode := http.StatusOK
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -40,7 +41,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	for _, data := range req {
 		containers := data.Pod.Spec.Containers
 		metadata := data.Pod.ObjectMeta
-		filesPath := commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID)
+		filesPath := h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID)
 
 		var singularity_command_pod []SingularityCommand
 
@@ -51,11 +52,11 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 				singularityPrefix += " " + singularityAnnotation
 			}
 			commstr1 := []string{"singularity", "exec", "--writable-tmpfs", "--nv", "-H", "${HOME}/" +
-				commonIL.InterLinkConfigInst.DataRootFolder + string(data.Pod.UID) + ":${HOME}"}
+				h.Config.DataRootFolder + string(data.Pod.UID) + ":${HOME}"}
 
-			envs := prepare_envs(container)
+			envs := prepareEnvs(container)
 			image := ""
-			mounts, err := prepare_mounts(filesPath, container, req)
+			mounts, err := prepareMounts(filesPath, container, req, h.Config)
 			log.G(Ctx).Debug(mounts)
 			if err != nil {
 				statusCode = http.StatusInternalServerError
@@ -87,7 +88,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			singularity_command_pod = append(singularity_command_pod, SingularityCommand{command: singularity_command, containerName: container.Name})
 		}
 
-		path, err := produce_slurm_script(filesPath, data.Pod.Namespace, string(data.Pod.UID), metadata, singularity_command_pod)
+		path, err := produceSLURMScript(filesPath, data.Pod.Namespace, string(data.Pod.UID), metadata, singularity_command_pod, h.Config)
 		if err != nil {
 			statusCode = http.StatusInternalServerError
 			w.WriteHeader(statusCode)
@@ -96,7 +97,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			os.RemoveAll(filesPath)
 			return
 		}
-		out, err := slurm_batch_submit(path)
+		out, err := SLURMBatchSubmit(path, h.Config)
 		if err != nil {
 			statusCode = http.StatusInternalServerError
 			w.WriteHeader(statusCode)
@@ -113,7 +114,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Error handling JID. Check Slurm Sidecar's logs"))
 			log.G(Ctx).Error(err)
 			os.RemoveAll(filesPath)
-			err = delete_container(string(data.Pod.UID), filesPath)
+			err = deleteContainer(string(data.Pod.UID), filesPath, h.Config)
 			return
 		}
 	}

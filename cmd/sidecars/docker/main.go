@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -13,14 +12,16 @@ import (
 )
 
 func main() {
-	var cancel context.CancelFunc
 	logger := logrus.StandardLogger()
 
-  commonIL.NewInterLinkConfig()
+	interLinkConfig, err := commonIL.NewInterLinkConfig()
+	if err != nil {
+		log.L.Fatal(err)
+	}
 
-	if commonIL.InterLinkConfigInst.VerboseLogging {
+	if interLinkConfig.VerboseLogging {
 		logger.SetLevel(logrus.DebugLevel)
-	} else if commonIL.InterLinkConfigInst.ErrorsOnlyLogging {
+	} else if interLinkConfig.ErrorsOnlyLogging {
 		logger.SetLevel(logrus.ErrorLevel)
 	} else {
 		logger.SetLevel(logrus.InfoLevel)
@@ -28,15 +29,16 @@ func main() {
 
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
 
-	docker.Ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
+	SidecarAPIs := docker.SidecarHandler{
+		Config: interLinkConfig,
+	}
 
 	mutex := http.NewServeMux()
-	mutex.HandleFunc("/status", docker.StatusHandler)
-	mutex.HandleFunc("/create", docker.CreateHandler)
-	mutex.HandleFunc("/delete", docker.DeleteHandler)
-	mutex.HandleFunc("/getLogs", docker.GetLogsHandler)
-	err := http.ListenAndServe(":"+commonIL.InterLinkConfigInst.Sidecarport, mutex)
+	mutex.HandleFunc("/status", SidecarAPIs.StatusHandler)
+	mutex.HandleFunc("/create", SidecarAPIs.CreateHandler)
+	mutex.HandleFunc("/delete", SidecarAPIs.DeleteHandler)
+	mutex.HandleFunc("/getLogs", SidecarAPIs.GetLogsHandler)
+	err = http.ListenAndServe(":"+interLinkConfig.Sidecarport, mutex)
 
 	if err != nil {
 		log.L.Fatal(err)

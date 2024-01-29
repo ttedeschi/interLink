@@ -9,10 +9,11 @@ import (
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func CreateHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Docker Sidecar: received Create call")
 	var execReturn exec.ExecResult
 	statusCode := http.StatusOK
@@ -41,14 +42,14 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 			log.G(Ctx).Info("- Creating container " + container.Name)
 			cmd := []string{"run", "-d", "--name", container.Name}
 
-			if commonIL.InterLinkConfigInst.ExportPodData {
-				mounts, err := prepare_mounts(container, req)
+			if h.Config.ExportPodData {
+				mounts, err := prepareMounts(container, req, h.Config)
 				if err != nil {
 					statusCode = http.StatusInternalServerError
 					log.G(Ctx).Error(err)
 					w.WriteHeader(statusCode)
 					w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-					os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+					os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 					return
 				}
 				cmd = append(cmd, mounts)
@@ -86,7 +87,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 				log.G(Ctx).Error(err)
 				w.WriteHeader(statusCode)
 				w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-				os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+				os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 				return
 			}
 
@@ -99,7 +100,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 					log.G(Ctx).Error("Unable to create container " + container.Name + " : " + execReturn.Stderr)
 					w.WriteHeader(statusCode)
 					w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-					os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+					os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 					return
 				}
 			} else {
@@ -119,7 +120,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 				log.G(Ctx).Error("Failed to retrieve " + container.Name + " ID : " + execReturn.Stderr)
 				w.WriteHeader(statusCode)
 				w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-				os.RemoveAll(commonIL.InterLinkConfigInst.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+				os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 				return
 			} else if execReturn.Stdout == "" {
 				log.G(Ctx).Error("Container name not found. Maybe creation failed?")

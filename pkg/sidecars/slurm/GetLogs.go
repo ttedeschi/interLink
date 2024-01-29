@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Docker Sidecar: received GetLogs call")
 	var req commonIL.LogStruct
 	statusCode := http.StatusOK
@@ -37,7 +38,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := commonIL.InterLinkConfigInst.DataRootFolder + req.Namespace + "-" + req.PodUID
+	path := h.Config.DataRootFolder + req.Namespace + "-" + req.PodUID
 	var output []byte
 	if req.Opts.Timestamps {
 		log.G(Ctx).Error(errors.New("Not Implemented"))

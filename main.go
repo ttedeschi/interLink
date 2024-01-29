@@ -43,8 +43,6 @@ import (
 
 	// "net/http"
 
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 	"github.com/sirupsen/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
@@ -54,6 +52,9 @@ import (
 	"github.com/virtual-kubelet/virtual-kubelet/trace/opentelemetry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
+
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -90,7 +91,7 @@ type Opts struct {
 }
 
 // NewOpts returns an Opts struct with the default values set.
-func NewOpts(nodename string, configpath string) *Opts {
+func NewOpts(nodename string, configpath string, config commonIL.InterLinkConfig) *Opts {
 
 	if nodename == "" {
 		nodename = os.Getenv("NODENAME")
@@ -103,8 +104,8 @@ func NewOpts(nodename string, configpath string) *Opts {
 	return &Opts{
 		ConfigPath: configpath,
 		NodeName:   nodename,
-		Verbose:    commonIL.InterLinkConfigInst.VerboseLogging,
-		ErrorsOnly: commonIL.InterLinkConfigInst.ErrorsOnlyLogging,
+		Verbose:    config.VerboseLogging,
+		ErrorsOnly: config.ErrorsOnlyLogging,
 	}
 }
 
@@ -167,13 +168,16 @@ func main() {
 	defer cancel()
 	nodename := flag.String("nodename", "", "The name of the node")
 	configpath := flag.String("configpath", "", "Path to the VK config")
-	commonIL.NewInterLinkConfig()
-	opts := NewOpts(*nodename, *configpath)
+	interLinkConfig, err := commonIL.NewInterLinkConfig()
+	if err != nil {
+		panic(err)
+	}
+	opts := NewOpts(*nodename, *configpath, interLinkConfig)
 
 	logger := logrus.StandardLogger()
-	if commonIL.InterLinkConfigInst.VerboseLogging {
+	if interLinkConfig.VerboseLogging {
 		logger.SetLevel(logrus.DebugLevel)
-	} else if commonIL.InterLinkConfigInst.ErrorsOnlyLogging {
+	} else if interLinkConfig.ErrorsOnlyLogging {
 		logger.SetLevel(logrus.ErrorLevel)
 	} else {
 		logger.SetLevel(logrus.InfoLevel)
@@ -236,7 +240,7 @@ func main() {
 
 	localClient := kubernetes.NewForConfigOrDie(kubecfg)
 
-	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx)
+	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx, interLinkConfig)
 	go func() {
 
 		ILbind := false
@@ -244,7 +248,7 @@ func main() {
 		counter := 0
 
 		for {
-			err, ILbind, retValue = commonIL.PingInterLink(ctx)
+			ILbind, retValue, err = commonIL.PingInterLink(ctx)
 
 			if err != nil {
 				log.G(ctx).Error(err)
@@ -351,7 +355,7 @@ func main() {
 
 	api.AttachPodRoutes(podRoutes, mux, true)
 
-	parsedIP := net.ParseIP(commonIL.InterLinkConfigInst.PodIP)
+	parsedIP := net.ParseIP(interLinkConfig.PodIP)
 	retriever := newSelfSignedCertificateRetriever(cfg.NodeName, parsedIP)
 
 	server := &http.Server{

@@ -10,10 +10,11 @@ import (
 	OSexec "os/exec"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Docker Sidecar: received GetLogs call")
 	var req commonIL.LogStruct
 	statusCode := http.StatusOK

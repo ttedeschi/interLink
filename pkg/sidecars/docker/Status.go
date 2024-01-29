@@ -8,11 +8,12 @@ import (
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	v1 "k8s.io/api/core/v1"
+
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("Docker Sidecar: received GetStatus call")
 	var resp []commonIL.PodStatus
 	var req []*v1.Pod
@@ -58,6 +59,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 			containerstatus := strings.Split(execReturn.Stdout, " ")
 
+			// TODO: why first container?
 			if execReturn.Stdout != "" {
 				if containerstatus[0] == "Created" {
 					log.G(Ctx).Info("-- Container " + container.Name + " is going ready...")
