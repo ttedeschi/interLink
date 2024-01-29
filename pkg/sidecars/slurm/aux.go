@@ -20,11 +20,11 @@ import (
 
 type SidecarHandler struct {
 	Config commonIL.InterLinkConfig
+	JIDs   *map[string]*JidStruct
+	Ctx    context.Context
 }
 
 var prefix string
-var Ctx context.Context
-var JIDs map[string]*JidStruct
 var timer time.Time
 var cachedStatus []commonIL.PodStatus
 
@@ -40,7 +40,7 @@ type SingularityCommand struct {
 	command       []string
 }
 
-func parsingTimeFromString(stringTime string) (time.Time, error) {
+func parsingTimeFromString(stringTime string, Ctx context.Context) (time.Time, error) {
 	parsedTime := time.Time{}
 	timestampFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 	parts := strings.Fields(stringTime)
@@ -72,7 +72,7 @@ func CreateDirectories(config commonIL.InterLinkConfig) error {
 	return nil
 }
 
-func LoadJIDs(config commonIL.InterLinkConfig) error {
+func LoadJIDs(config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx context.Context) error {
 	path := config.DataRootFolder
 
 	dir, err := os.Open(path)
@@ -103,7 +103,7 @@ func LoadJIDs(config commonIL.InterLinkConfig) error {
 			if err != nil {
 				log.G(Ctx).Debug(err)
 			} else {
-				StartedAt, err = parsingTimeFromString(string(StartedAtString))
+				StartedAt, err = parsingTimeFromString(string(StartedAtString), Ctx)
 				if err != nil {
 					log.G(Ctx).Debug(err)
 				}
@@ -113,21 +113,20 @@ func LoadJIDs(config commonIL.InterLinkConfig) error {
 			if err != nil {
 				log.G(Ctx).Debug(err)
 			} else {
-				FinishedAt, err = parsingTimeFromString(string(FinishedAtString))
+				FinishedAt, err = parsingTimeFromString(string(FinishedAtString), Ctx)
 				if err != nil {
 					log.G(Ctx).Debug(err)
 				}
 			}
-			JIDs[podUID] = &JidStruct{PodUID: podUID, JID: string(JID), StartTime: StartedAt, EndTime: FinishedAt}
+			JIDEntry := JidStruct{PodUID: podUID, JID: string(JID), StartTime: StartedAt, EndTime: FinishedAt}
+			(*JIDs)[podUID] = &JIDEntry
 		}
 	}
-
-	log.G(Ctx).Debug(JIDs)
 
 	return nil
 }
 
-func prepareEnvs(container v1.Container) []string {
+func prepareEnvs(container v1.Container, Ctx context.Context) []string {
 	if len(container.Env) > 0 {
 		log.G(Ctx).Info("-- Appending envs")
 		env := make([]string, 1)
@@ -151,7 +150,13 @@ func prepareEnvs(container v1.Container) []string {
 	}
 }
 
-func prepareMounts(workingPath string, container v1.Container, data []commonIL.RetrievedPodData, config commonIL.InterLinkConfig) ([]string, error) {
+func prepareMounts(
+	workingPath string,
+	container v1.Container,
+	data []commonIL.RetrievedPodData,
+	config commonIL.InterLinkConfig,
+	Ctx context.Context,
+) ([]string, error) {
 	log.G(Ctx).Info("-- Preparing mountpoints for " + container.Name)
 	mount := make([]string, 1)
 	mount = append(mount, "--bind")
@@ -169,7 +174,7 @@ func prepareMounts(workingPath string, container v1.Container, data []commonIL.R
 		for _, cont := range podData.Containers {
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
-					configMapsPaths, envs, err := mountData(workingPath, container, podData.Pod, cfgMap, config)
+					configMapsPaths, envs, err := mountData(workingPath, container, podData.Pod, cfgMap, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -189,7 +194,7 @@ func prepareMounts(workingPath string, container v1.Container, data []commonIL.R
 
 			for _, secret := range cont.Secrets {
 				if container.Name == cont.Name {
-					secretsPaths, envs, err := mountData(workingPath, container, podData.Pod, secret, config)
+					secretsPaths, envs, err := mountData(workingPath, container, podData.Pod, secret, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -208,7 +213,7 @@ func prepareMounts(workingPath string, container v1.Container, data []commonIL.R
 
 			for _, emptyDir := range cont.EmptyDirs {
 				if container.Name == cont.Name {
-					paths, _, err := mountData(workingPath, container, podData.Pod, emptyDir, config)
+					paths, _, err := mountData(workingPath, container, podData.Pod, emptyDir, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -240,6 +245,7 @@ func produceSLURMScript(
 	metadata metav1.ObjectMeta,
 	commands []SingularityCommand,
 	config commonIL.InterLinkConfig,
+	Ctx context.Context,
 ) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
 	err := os.MkdirAll(path, os.ModePerm)
@@ -351,7 +357,7 @@ func produceSLURMScript(
 	return f.Name(), nil
 }
 
-func SLURMBatchSubmit(path string, config commonIL.InterLinkConfig) (string, error) {
+func SLURMBatchSubmit(path string, config commonIL.InterLinkConfig, Ctx context.Context) (string, error) {
 	log.G(Ctx).Info("- Submitting Slurm job")
 	cmd := []string{path}
 	shell := exec2.ExecTask{
@@ -376,7 +382,7 @@ func SLURMBatchSubmit(path string, config commonIL.InterLinkConfig) (string, err
 	return string(execReturn.Stdout), nil
 }
 
-func handle_jid(podUID string, output string, pod v1.Pod, path string) error {
+func handleJID(podUID string, output string, pod v1.Pod, path string, JIDs *map[string]*JidStruct, Ctx context.Context) error {
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
 	f, err := os.Create(path + "/JobID.jid")
@@ -391,26 +397,26 @@ func handle_jid(podUID string, output string, pod v1.Pod, path string) error {
 		return err
 	}
 
-	JIDs[podUID] = &JidStruct{PodUID: string(pod.UID), JID: jid[1]}
-	log.G(Ctx).Info("Job ID is: " + JIDs[podUID].JID)
+	(*JIDs)[podUID] = &JidStruct{PodUID: string(pod.UID), JID: jid[1]}
+	log.G(Ctx).Info("Job ID is: " + (*JIDs)[podUID].JID)
 	return nil
 }
 
-func removeJID(podUID string) {
-	delete(JIDs, podUID)
+func removeJID(podUID string, JIDs *map[string]*JidStruct) {
+	delete(*JIDs, podUID)
 }
 
-func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig) error {
+func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx context.Context) error {
 	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
-	_, err := exec.Command(config.Scancelpath, JIDs[podUID].JID).Output()
+	_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
 	if err != nil {
 		log.G(Ctx).Error(err)
 		return err
 	} else {
-		log.G(Ctx).Info("- Deleted Job ", JIDs[podUID].JID)
+		log.G(Ctx).Info("- Deleted Job ", (*JIDs)[podUID].JID)
 	}
 	os.RemoveAll(path + "/" + podUID)
-	removeJID(podUID)
+	removeJID(podUID, JIDs)
 	if err != nil {
 		log.G(Ctx).Warning(err)
 		return err
@@ -418,7 +424,7 @@ func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig
 	return nil
 }
 
-func mountData(path string, container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig) ([]string, []string, error) {
+func mountData(path string, container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig, Ctx context.Context) ([]string, []string, error) {
 	if config.ExportPodData {
 		for _, mountSpec := range container.VolumeMounts {
 			var podVolumeSpec *v1.VolumeSource

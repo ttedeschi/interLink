@@ -5,10 +5,12 @@ services:
       context: ../../../
       dockerfile: docker/Dockerfile.interlink
     restart: always
-    network_mode: "host"
+    #network_mode: "host"
+    ports:
+    - 3000:3000
     volumes:
     - type: bind
-      source: ./config
+      source: ../vk
       target: /etc/interlink
     environment:
     - INTERLINKCONFIGPATH=/etc/interlink/InterLinkConfig.yaml
@@ -26,12 +28,14 @@ services:
     privileged: true
     cap_add:
     - SYS_ADMIN
-    network_mode: "host"
+    #network_mode: "host"
+    ports:
+    - 4000:4000
     environment:
     - INTERLINKCONFIGPATH=/etc/interlink/InterLinkConfig.yaml
     volumes:
     - type: bind
-      source: ./config
+      source: ../vk
       target: /etc/interlink
     - type: bind
       source: /var/run/docker.sock 

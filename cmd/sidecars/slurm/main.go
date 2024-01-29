@@ -32,8 +32,13 @@ func main() {
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
 	log.G(context.Background()).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
 
+	JobIDs := make(map[string]*slurm.JidStruct)
+	Ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	SidecarAPIs := slurm.SidecarHandler{
 		Config: interLinkConfig,
+		JIDs:   &JobIDs,
+		Ctx:    Ctx,
 	}
 
 	mutex := http.NewServeMux()
@@ -43,10 +48,10 @@ func main() {
 	mutex.HandleFunc("/getLogs", SidecarAPIs.GetLogsHandler)
 
 	slurm.CreateDirectories(interLinkConfig)
-	slurm.LoadJIDs(interLinkConfig)
+	slurm.LoadJIDs(interLinkConfig, &JobIDs, Ctx)
 
 	err = http.ListenAndServe(":"+interLinkConfig.Sidecarport, mutex)
 	if err != nil {
-		log.G(slurm.Ctx).Fatal(err)
+		log.G(Ctx).Fatal(err)
 	}
 }
