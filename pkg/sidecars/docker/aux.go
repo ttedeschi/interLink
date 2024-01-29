@@ -14,13 +14,12 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-var Ctx context.Context
-
 type SidecarHandler struct {
 	Config commonIL.InterLinkConfig
+	Ctx    context.Context
 }
 
-func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, config commonIL.InterLinkConfig) (string, error) {
+func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, config commonIL.InterLinkConfig, Ctx context.Context) (string, error) {
 	log.G(Ctx).Info("- Preparing mountpoints for " + container.Name)
 	mountedData := ""
 
@@ -35,7 +34,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 		for _, cont := range podData.Containers {
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, cfgMap, config)
+					paths, err := mountData(container, podData.Pod, cfgMap, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting ConfigMap " + cfgMap.Name)
 						return "", errors.New("Error mounting ConfigMap " + cfgMap.Name)
@@ -48,7 +47,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 
 			for _, secret := range cont.Secrets {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, secret, config)
+					paths, err := mountData(container, podData.Pod, secret, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting Secret " + secret.Name)
 						return "", errors.New("Error mounting Secret " + secret.Name)
@@ -61,7 +60,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 
 			for _, emptyDir := range cont.EmptyDirs {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, emptyDir, config)
+					paths, err := mountData(container, podData.Pod, emptyDir, config, Ctx)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting EmptyDir " + emptyDir)
 						return "", errors.New("Error mounting EmptyDir " + emptyDir)
@@ -80,7 +79,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 	return mountedData, nil
 }
 
-func mountData(container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig) ([]string, error) {
+func mountData(container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig, Ctx context.Context) ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		log.G(Ctx).Error(err)

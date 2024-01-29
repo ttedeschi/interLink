@@ -30,11 +30,12 @@ func main() {
 	}
 
 	log.L = logruslogger.FromLogrus(logrus.NewEntry(logger))
-	log.G(context.Background()).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
 
 	JobIDs := make(map[string]*slurm.JidStruct)
 	Ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	log.G(Ctx).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
+
 	SidecarAPIs := slurm.SidecarHandler{
 		Config: interLinkConfig,
 		JIDs:   &JobIDs,
