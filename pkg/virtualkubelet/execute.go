@@ -22,11 +22,11 @@ import (
 
 var ClientSet *kubernetes.Clientset
 
-func updateCacheRequest(uid string, token string) error {
+func updateCacheRequest(uid string, token string, config commonIL.InterLinkConfig) error {
 	bodyBytes := []byte(uid)
 
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/updateCache", reader)
+	req, err := http.NewRequest(http.MethodPost, config.Interlinkurl+":"+config.Interlinkport+"/updateCache", reader)
 	if err != nil {
 		log.L.Error(err)
 		return err
@@ -47,7 +47,7 @@ func updateCacheRequest(uid string, token string) error {
 	return err
 }
 
-func createRequest(pod commonIL.PodCreateRequests, token string) ([]byte, error) {
+func createRequest(pod commonIL.PodCreateRequests, token string, config commonIL.InterLinkConfig) ([]byte, error) {
 	var returnValue, _ = json.Marshal(commonIL.PodStatus{})
 
 	bodyBytes, err := json.Marshal(pod)
@@ -56,7 +56,7 @@ func createRequest(pod commonIL.PodCreateRequests, token string) ([]byte, error)
 		return nil, err
 	}
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/create", reader)
+	req, err := http.NewRequest(http.MethodPost, config.Interlinkurl+":"+config.Interlinkport+"/create", reader)
 	if err != nil {
 		log.L.Error(err)
 		return nil, err
@@ -73,27 +73,25 @@ func createRequest(pod commonIL.PodCreateRequests, token string) ([]byte, error)
 	if statusCode != http.StatusOK {
 		return nil, errors.New("Unexpected error occured while creating Pods. Status code: " + strconv.Itoa(resp.StatusCode) + ". Check InterLink's logs for further informations")
 	} else {
-		log.G(context.Background()).Info(string(returnValue))
 		returnValue, err = io.ReadAll(resp.Body)
 		if err != nil {
 			log.L.Error(err)
 			return nil, err
 		}
+		log.G(context.Background()).Info(string(returnValue))
 	}
 
 	return returnValue, nil
 }
 
-func deleteRequest(pod *v1.Pod, token string) ([]byte, error) {
-	returnValue, _ := json.Marshal(commonIL.PodStatus{})
-
+func deleteRequest(pod *v1.Pod, token string, config commonIL.InterLinkConfig) ([]byte, error) {
 	bodyBytes, err := json.Marshal(pod)
 	if err != nil {
 		log.G(context.Background()).Error(err)
 		return nil, err
 	}
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodDelete, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/delete", reader)
+	req, err := http.NewRequest(http.MethodDelete, config.Interlinkurl+":"+config.Interlinkport+"/delete", reader)
 	if err != nil {
 		log.G(context.Background()).Error(err)
 		return nil, err
@@ -111,7 +109,11 @@ func deleteRequest(pod *v1.Pod, token string) ([]byte, error) {
 	if statusCode != http.StatusOK {
 		return nil, errors.New("Unexpected error occured while deleting Pods. Status code: " + strconv.Itoa(resp.StatusCode) + ". Check InterLink's logs for further informations")
 	} else {
-		returnValue, _ = io.ReadAll(resp.Body)
+		returnValue, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.G(context.Background()).Error(err)
+			return nil, err
+		}
 		log.G(context.Background()).Info(string(returnValue))
 		var response []commonIL.PodStatus
 		err = json.Unmarshal(returnValue, &response)
@@ -119,12 +121,12 @@ func deleteRequest(pod *v1.Pod, token string) ([]byte, error) {
 			log.G(context.Background()).Error(err)
 			return nil, err
 		}
+		return returnValue, nil
 	}
 
-	return returnValue, nil
 }
 
-func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
+func statusRequest(podsList []*v1.Pod, token string, config commonIL.InterLinkConfig) ([]byte, error) {
 	var returnValue []byte
 
 	bodyBytes, err := json.Marshal(podsList)
@@ -133,7 +135,7 @@ func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
 		return nil, err
 	}
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodGet, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/status", reader)
+	req, err := http.NewRequest(http.MethodGet, config.Interlinkurl+":"+config.Interlinkport+"/status", reader)
 	if err != nil {
 		log.L.Error(err)
 		return nil, err
@@ -151,7 +153,7 @@ func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("Unexpected error occured while getting status. Status code: " + strconv.Itoa(resp.StatusCode) + ". Check InterLink's logs for further informations")
 	} else {
-		returnValue, _ = io.ReadAll(resp.Body)
+		returnValue, err = io.ReadAll(resp.Body)
 		if err != nil {
 			log.L.Error(err)
 			return nil, err
@@ -161,8 +163,8 @@ func statusRequest(podsList []*v1.Pod, token string) ([]byte, error) {
 	return returnValue, nil
 }
 
-func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest commonIL.LogStruct) (io.ReadCloser, error) {
-	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
+func LogRetrieval(ctx context.Context, logsRequest commonIL.LogStruct, config commonIL.InterLinkConfig) (io.ReadCloser, error) {
+	b, err := os.ReadFile(config.VKTokenFile) // just pass the file name
 	if err != nil {
 		log.G(ctx).Fatal(err)
 	}
@@ -174,7 +176,7 @@ func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest co
 		return nil, err
 	}
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodGet, commonIL.InterLinkConfigInst.Interlinkurl+":"+commonIL.InterLinkConfigInst.Interlinkport+"/getLogs", reader)
+	req, err := http.NewRequest(http.MethodGet, config.Interlinkurl+":"+config.Interlinkport+"/getLogs", reader)
 	if err != nil {
 		log.G(ctx).Error(err)
 		return nil, err
@@ -198,11 +200,12 @@ func LogRetrieval(p *VirtualKubeletProvider, ctx context.Context, logsRequest co
 	}
 }
 
-func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, imageLocation string, pod *v1.Pod) error {
+func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonIL.InterLinkConfig) error {
 
-	b, err := os.ReadFile(commonIL.InterLinkConfigInst.VKTokenFile) // just pass the file name
+	b, err := os.ReadFile(config.VKTokenFile) // just pass the file name
 	if err != nil {
 		log.G(ctx).Fatal(err)
+		return err
 	}
 	token := string(b)
 
@@ -212,13 +215,8 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 		var req commonIL.PodCreateRequests
 		req.Pod = *pod
 		for {
-			var err error
 			if ClientSet == nil {
 				kubeconfig := os.Getenv("KUBECONFIG")
-				if err != nil {
-					log.G(ctx).Error(err)
-					return err
-				}
 
 				config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 				if err != nil {
@@ -233,11 +231,14 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 				}
 			}
 
+			var failed bool
+
 			for _, volume := range pod.Spec.Volumes {
 
 				if volume.ConfigMap != nil {
 					cfgmap, err := ClientSet.CoreV1().ConfigMaps(pod.Namespace).Get(ctx, volume.ConfigMap.Name, metav1.GetOptions{})
 					if err != nil {
+						failed = true
 						log.G(ctx).Warning("Unable to find ConfigMap " + volume.ConfigMap.Name + " for pod " + pod.Name + ". Waiting for it to be initialized")
 						break
 					} else {
@@ -246,6 +247,7 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 				} else if volume.Secret != nil {
 					scrt, err := ClientSet.CoreV1().Secrets(pod.Namespace).Get(ctx, volume.Secret.SecretName, metav1.GetOptions{})
 					if err != nil {
+						failed = true
 						log.G(ctx).Warning("Unable to find Secret " + volume.Secret.SecretName + " for pod " + pod.Name + ". Waiting for it to be initialized")
 						break
 					} else {
@@ -254,7 +256,7 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 				}
 			}
 
-			if err != nil {
+			if failed {
 				time.Sleep(time.Second)
 				continue
 			} else {
@@ -262,16 +264,15 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 			}
 		}
 
-		returnVal, err := createRequest(req, token)
+		returnVal, err := createRequest(req, token, config)
 		if err != nil {
 			log.G(ctx).Error(err)
 			return err
 		}
 		log.G(ctx).Info(string(returnVal))
-		break
 	case DELETE:
 		req := pod
-		returnVal, err := deleteRequest(req, token)
+		returnVal, err := deleteRequest(req, token, config)
 		if err != nil {
 			log.G(ctx).Error(err)
 			return err
@@ -281,7 +282,7 @@ func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, 
 	return nil
 }
 
-func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token string) error {
+func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token string, config commonIL.InterLinkConfig) error {
 	if len(p.pods) == 0 {
 		return nil
 	}
@@ -294,7 +295,7 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 	}
 	//log.G(ctx).Debug(p.pods) //commented out because it's too verbose. uncomment to see all registered pods
 
-	returnVal, err := statusRequest(PodsList, token)
+	returnVal, err := statusRequest(PodsList, token, config)
 	if err != nil {
 		return err
 	} else if returnVal != nil {
@@ -308,7 +309,7 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 
 			pod, err := p.GetPod(ctx, podStatus.PodNamespace, podStatus.PodName)
 			if err != nil {
-				updateCacheRequest(podStatus.PodUID, token)
+				updateCacheRequest(podStatus.PodUID, token, config)
 				log.G(ctx).Error(err)
 				return err
 			}

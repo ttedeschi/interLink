@@ -28,15 +28,12 @@ Move to example location:
 
 ```bash
 cd interLink/examples/interlink-docker
-
-mkdir -p interlink/config
-cp vk/InterLinkConfig.yaml interlink/config/InterLinkConfig.yaml
 ```
 
 ### Setup Kubernetes cluster
 
 ```bash
-minikube start --kubernetes-version=1.24.3
+minikube start --kubernetes-version=1.26.10
 ```
 
 ### Deploy Interlink
@@ -47,8 +44,6 @@ You need to provide the interLink IP address that should be reachable from the k
 
 ```bash
 export INTERLINK_IP_ADDRESS=XXX.XX.X.XXX
-
-sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  interlink/config/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' interlink/config/InterLinkConfig.yaml
 
 sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  vk/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' vk/InterLinkConfig.yaml
 ```
@@ -134,7 +129,7 @@ __N.B.__ in the demo the oauth2 proxy authN/Z is disabled. DO NOT USE THIS IN PR
 ### Bootstrap a minikube cluster
 
 ```bash
-minikube start --kubernetes-version=1.27.1
+minikube start --kubernetes-version=1.26.10
 ```
 
 Once finished you should check that everything went well with a simple `kubectl get node`. 
@@ -157,8 +152,6 @@ In case of this demo setup, that address __is the address of your machine__
 
 ```bash
 export INTERLINK_IP_ADDRESS=XXX.XX.X.XXX
-
-sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  interlink/config/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' interlink/config/InterLinkConfig.yaml
 
 sed -i 's/InterlinkURL:.*/InterlinkURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g'  vk/InterLinkConfig.yaml | sed -i 's/SidecarURL:.*/SidecarURL: "http:\/\/'$INTERLINK_IP_ADDRESS'"/g' vk/InterLinkConfig.yaml
 ```
