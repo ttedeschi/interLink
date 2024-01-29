@@ -58,6 +58,9 @@ spec:
           subPath: vk-cfg.json
         - name: token
           mountPath: /opt/interlink
+        - name: kubeconfig
+          mountPath: "/etc/interlink/kubeconfig.yaml"
+          subPath: kubeconfig.yaml
         resources:
           limits:
             cpu: 500m
