@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 
+	//certificates "k8s.io/api/certificates/v1"
+
 	"net/http"
 
 	"k8s.io/client-go/kubernetes"
@@ -356,15 +358,22 @@ func main() {
 	api.AttachPodRoutes(podRoutes, mux, true)
 
 	parsedIP := net.ParseIP(interLinkConfig.PodIP)
+
+	//retriever, err := newCertificateRetriever(localClient, certificates.KubeletServingSignerName, cfg.NodeName, parsedIP)
+	//if err != nil {
+	//	log.G(ctx).Fatal("failed to initialize certificate manager: %w", err)
+	//}
+	// TODO: create a csr auto approver https://github.com/liqotech/liqo/blob/master/cmd/liqo-controller-manager/main.go#L498
 	retriever := newSelfSignedCertificateRetriever(cfg.NodeName, parsedIP)
 
 	server := &http.Server{
-		Addr:              fmt.Sprintf("0.0.0.0:%d", 10255),
+		Addr:              fmt.Sprintf("0.0.0.0:%d", 10250),
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second, // Required to limit the effects of the Slowloris attack.
 		TLSConfig: &tls.Config{
-			GetCertificate: retriever,
-			MinVersion:     tls.VersionTLS12,
+			GetCertificate:     retriever,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true,
 		},
 	}
 
