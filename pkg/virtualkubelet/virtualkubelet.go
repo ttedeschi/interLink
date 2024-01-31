@@ -257,8 +257,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 
 		pod.Status = v1.PodStatus{
 			Phase:     v1.PodRunning,
-			HostIP:    "127.0.0.1",
-			PodIP:     "127.0.0.1",
+			HostIP:    p.internalIP,
+			PodIP:     p.internalIP,
 			StartTime: &now,
 			Conditions: []v1.PodCondition{
 				{
@@ -278,8 +278,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	} else {
 		pod.Status = v1.PodStatus{
 			Phase:     v1.PodPending,
-			HostIP:    "127.0.0.1",
-			PodIP:     "127.0.0.1",
+			HostIP:    p.internalIP,
+			PodIP:     p.internalIP,
 			StartTime: &now,
 			Conditions: []v1.PodCondition{
 				{
@@ -578,6 +578,7 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 	if err != nil {
 		log.G(ctx).Error(err)
 	}
+	log.G(ctx).Infof("debug Pod in Providers %q", p.pods)
 
 	logsRequest := commonIL.LogStruct{
 		Namespace:     namespace,
