@@ -578,7 +578,6 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 	if err != nil {
 		log.G(ctx).Error(err)
 	}
-	log.G(ctx).Infof("debug Pod in Providers %q", p.pods)
 
 	logsRequest := commonIL.LogStruct{
 		Namespace:     namespace,
