@@ -237,10 +237,17 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	}
 	state = runningState
 
-	err = RemoteExecution(ctx, CREATE, pod, p.interLinkConfig)
-	if err != nil {
-		return err
-	}
+	go func() {
+		err = RemoteExecution(p, ctx, CREATE, pod, p.interLinkConfig)
+		if err != nil {
+			if err.Error() == "Deleted pod before actual creation" {
+				log.G(ctx).Warn(err)
+			} else {
+				log.G(ctx).Error(err)
+			}
+			return
+		}
+	}()
 
 	// in case we have initContainers we need to stop main containers from executing for now ...
 	if len(pod.Spec.InitContainers) > 0 {
@@ -364,14 +371,15 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	}
 
 	now := metav1.Now()
-	pod.Status.Phase = v1.PodSucceeded
 	pod.Status.Reason = "VKProviderPodDeleted"
 
-	err = RemoteExecution(ctx, DELETE, pod, p.interLinkConfig)
-	if err != nil {
-		log.G(ctx).Error(err)
-		return err
-	}
+	go func() {
+		err = RemoteExecution(p, ctx, DELETE, pod, p.interLinkConfig)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return
+		}
+	}()
 
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false

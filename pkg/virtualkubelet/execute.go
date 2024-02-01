@@ -200,7 +200,7 @@ func LogRetrieval(ctx context.Context, logsRequest commonIL.LogStruct, config co
 	}
 }
 
-func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonIL.InterLinkConfig) error {
+func RemoteExecution(p *VirtualKubeletProvider, ctx context.Context, mode int8, pod *v1.Pod, config commonIL.InterLinkConfig) error {
 
 	b, err := os.ReadFile(config.VKTokenFile) // just pass the file name
 	if err != nil {
@@ -211,7 +211,6 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 
 	switch mode {
 	case CREATE:
-
 		var req commonIL.PodCreateRequests
 		req.Pod = *pod
 		for {
@@ -231,6 +230,11 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 				}
 			}
 
+			pod, err = ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return errors.New("Deleted pod before actual creation")
+			}
+
 			var failed bool
 
 			for _, volume := range pod.Spec.Volumes {
@@ -240,6 +244,10 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 					if err != nil {
 						failed = true
 						log.G(ctx).Warning("Unable to find ConfigMap " + volume.ConfigMap.Name + " for pod " + pod.Name + ". Waiting for it to be initialized")
+						if pod.Status.Phase != "Initializing" {
+							pod.Status.Phase = "Initializing"
+							p.UpdatePod(ctx, pod)
+						}
 						break
 					} else {
 						req.ConfigMaps = append(req.ConfigMaps, *cfgmap)
@@ -249,6 +257,10 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 					if err != nil {
 						failed = true
 						log.G(ctx).Warning("Unable to find Secret " + volume.Secret.SecretName + " for pod " + pod.Name + ". Waiting for it to be initialized")
+						if pod.Status.Phase != "Initializing" {
+							pod.Status.Phase = "Initializing"
+							p.UpdatePod(ctx, pod)
+						}
 						break
 					} else {
 						req.Secrets = append(req.Secrets, *scrt)
@@ -260,6 +272,8 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 				time.Sleep(time.Second)
 				continue
 			} else {
+				pod.Status.Phase = v1.PodPending
+				p.UpdatePod(ctx, pod)
 				break
 			}
 		}
@@ -272,12 +286,14 @@ func RemoteExecution(ctx context.Context, mode int8, pod *v1.Pod, config commonI
 		log.G(ctx).Info(string(returnVal))
 	case DELETE:
 		req := pod
-		returnVal, err := deleteRequest(req, token, config)
-		if err != nil {
-			log.G(ctx).Error(err)
-			return err
+		if pod.Status.Phase != "Initializing" {
+			returnVal, err := deleteRequest(req, token, config)
+			if err != nil {
+				log.G(ctx).Error(err)
+				return err
+			}
+			log.G(ctx).Info(string(returnVal))
 		}
-		log.G(ctx).Info(string(returnVal))
 	}
 	return nil
 }
@@ -289,78 +305,104 @@ func checkPodsStatus(p *VirtualKubeletProvider, ctx context.Context, token strin
 	var returnVal []byte
 	var ret []commonIL.PodStatus
 	var PodsList []*v1.Pod
+	var err error
 
 	for _, pod := range p.pods {
-		PodsList = append(PodsList, pod)
+		if pod.Status.Phase == v1.PodPending || pod.Status.Phase == v1.PodRunning {
+			PodsList = append(PodsList, pod)
+		}
 	}
 	//log.G(ctx).Debug(p.pods) //commented out because it's too verbose. uncomment to see all registered pods
 
-	returnVal, err := statusRequest(PodsList, token, config)
-	if err != nil {
-		return err
-	} else if returnVal != nil {
-		err = json.Unmarshal(returnVal, &ret)
+	if PodsList != nil {
+		returnVal, err = statusRequest(PodsList, token, config)
 		if err != nil {
 			return err
-		}
-
-		for _, podStatus := range ret {
-			updatePod := false
-
-			pod, err := p.GetPod(ctx, podStatus.PodNamespace, podStatus.PodName)
+		} else if returnVal != nil {
+			err = json.Unmarshal(returnVal, &ret)
 			if err != nil {
-				updateCacheRequest(podStatus.PodUID, token, config)
-				log.G(ctx).Error(err)
 				return err
 			}
 
-			if podStatus.PodUID == string(pod.UID) {
-				for _, containerStatus := range podStatus.Containers {
-					index := 0
+			for _, podStatus := range ret {
 
-					for i, checkedContainer := range pod.Status.ContainerStatuses {
-						if checkedContainer.Name == containerStatus.Name {
-							index = i
-						}
-					}
-
-					if containerStatus.State.Terminated != nil {
-						log.G(ctx).Debug("Pod " + podStatus.PodName + ": Service " + containerStatus.Name + " is not running on Sidecar")
-						updatePod = false
-						if containerStatus.State.Terminated.ExitCode == 0 {
-							pod.Status.Phase = v1.PodSucceeded
-							updatePod = true
-						} else {
-							pod.Status.Phase = v1.PodFailed
-							updatePod = true
-							log.G(ctx).Error("Container " + containerStatus.Name + " exited with error: " + string(containerStatus.State.Terminated.ExitCode))
-						}
-					} else if containerStatus.State.Waiting != nil {
-						log.G(ctx).Info("Pod " + podStatus.PodName + ": Service " + containerStatus.Name + " is setting up on Sidecar")
-						updatePod = false
-					} else if containerStatus.State.Running != nil {
-						pod.Status.Phase = v1.PodRunning
-						updatePod = true
-						if pod.Status.ContainerStatuses != nil {
-							pod.Status.ContainerStatuses[index].State = containerStatus.State
-							pod.Status.ContainerStatuses[index].Ready = containerStatus.Ready
-						}
-					}
-				}
-			}
-
-			if updatePod {
-				err = p.UpdatePod(ctx, pod)
+				pod, err := p.GetPod(ctx, podStatus.PodNamespace, podStatus.PodName)
 				if err != nil {
-					log.G(ctx).Error(err)
+					updateCacheRequest(podStatus.PodUID, token, config)
+					log.G(ctx).Warning("Error: " + err.Error() + "while getting statuses. Updating InterLink cache")
 					return err
 				}
-			}
-		}
 
-		log.G(ctx).Info("No errors while getting statuses")
-		log.G(ctx).Debug(ret)
-		return nil
+				if podStatus.PodUID == string(pod.UID) {
+					podRunning := false
+					podErrored := false
+					failedReason := ""
+					for _, containerStatus := range podStatus.Containers {
+						index := 0
+						foundCt := false
+
+						for i, checkedContainer := range pod.Status.ContainerStatuses {
+							if checkedContainer.Name == containerStatus.Name {
+								foundCt = true
+								index = i
+							}
+						}
+
+						if !foundCt {
+							pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, containerStatus)
+						} else {
+							pod.Status.ContainerStatuses[index] = containerStatus
+						}
+
+						if containerStatus.State.Terminated != nil {
+							log.G(ctx).Debug("Pod " + podStatus.PodName + ": Service " + containerStatus.Name + " is not running on Sidecar")
+							pod.Status.ContainerStatuses[index].State.Terminated.Reason = "Completed"
+							if containerStatus.State.Terminated.ExitCode != 0 {
+								podErrored = true
+								failedReason = "Error: " + string(containerStatus.State.Terminated.ExitCode)
+								pod.Status.ContainerStatuses[index].State.Terminated.Reason = failedReason
+								log.G(ctx).Error("Container " + containerStatus.Name + " exited with error: " + string(containerStatus.State.Terminated.ExitCode))
+							}
+						} else if containerStatus.State.Waiting != nil {
+							log.G(ctx).Info("Pod " + podStatus.PodName + ": Service " + containerStatus.Name + " is setting up on Sidecar")
+							podRunning = true
+						} else if containerStatus.State.Running != nil {
+							podRunning = true
+							log.G(ctx).Debug("Pod " + podStatus.PodName + ": Service " + containerStatus.Name + " is running on Sidecar")
+						}
+
+					}
+
+					if podRunning {
+						if pod.Status.Phase != v1.PodRunning {
+							pod.Status.Phase = v1.PodRunning
+						}
+					} else {
+						if podErrored {
+							if pod.Status.Phase != v1.PodFailed {
+								pod.Status.Phase = v1.PodFailed
+								pod.Status.Reason = failedReason
+							}
+						} else {
+							if pod.Status.Phase != v1.PodSucceeded {
+								pod.Status.Phase = v1.PodSucceeded
+								pod.Status.Reason = "Completed"
+							}
+						}
+					}
+
+					err = p.UpdatePod(ctx, pod)
+					if err != nil {
+						log.G(ctx).Error(err)
+						return err
+					}
+				}
+			}
+
+			log.G(ctx).Info("No errors while getting statuses")
+			log.G(ctx).Debug(ret)
+			return nil
+		}
 	}
 	return err
 }

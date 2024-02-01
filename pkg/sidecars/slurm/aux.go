@@ -408,14 +408,16 @@ func removeJID(podUID string, JIDs *map[string]*JidStruct) {
 
 func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx context.Context) error {
 	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
-	_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
-	if err != nil {
-		log.G(Ctx).Error(err)
-		return err
-	} else {
-		log.G(Ctx).Info("- Deleted Job ", (*JIDs)[podUID].JID)
+	if checkIfJidExists(JIDs, podUID) {
+		_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
+		if err != nil {
+			log.G(Ctx).Error(err)
+			return err
+		} else {
+			log.G(Ctx).Info("- Deleted Job ", (*JIDs)[podUID].JID)
+		}
 	}
-	os.RemoveAll(path + "/" + podUID)
+	err := os.RemoveAll(path + "/" + podUID)
 	removeJID(podUID, JIDs)
 	if err != nil {
 		log.G(Ctx).Warning(err)
@@ -613,4 +615,14 @@ func mountData(path string, container v1.Container, pod v1.Pod, data interface{}
 		}
 	}
 	return nil, nil, nil
+}
+
+func checkIfJidExists(JIDs *map[string]*JidStruct, uid string) bool {
+	_, ok := (*JIDs)[uid]
+
+	if ok {
+		return true
+	} else {
+		return false
+	}
 }
