@@ -356,10 +356,9 @@ func produceSLURMScript(
 
 func SLURMBatchSubmit(Ctx context.Context, config commonIL.InterLinkConfig, path string) (string, error) {
 	log.G(Ctx).Info("- Submitting Slurm job")
-	cmd := []string{path}
 	shell := exec2.ExecTask{
-		Command: config.Sbatchpath,
-		Args:    cmd,
+		Command: "sh",
+		Args:    []string{"-c", "\"" + config.Sbatchpath + " " + path + "\""},
 		Shell:   true,
 	}
 
@@ -417,7 +416,7 @@ func deleteContainer(Ctx context.Context, config commonIL.InterLinkConfig, podUI
 	err := os.RemoveAll(path + "/" + podUID)
 	removeJID(podUID, JIDs)
 	if err != nil {
-		log.G(Ctx).Warning(err)
+		log.G(Ctx).Error(err)
 		return err
 	}
 	return err
