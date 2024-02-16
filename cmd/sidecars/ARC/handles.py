@@ -21,9 +21,14 @@ parser.add_argument("--port", help="Server port", type=int, default=8000)
 args = parser.parse_args()
 
 if args.cadir != "":
-    os.environ["X509_CERT_DIR"] = args.cadir
+    #os.environ["X509_CERT_DIR"] = args.cadir
+    with open("/home/ttedesch/.arc/client.conf", "a") as file1:
+        file1.writelines(f"cacertificatesdirectory={args.cadir} \n")
+
 if args.proxy != "":
-    os.environ["X509_USER_PROXY"] = args.proxy
+    #os.environ["X509_USER_PROXY"] = args.proxy
+    with open("/home/ttedesch/.arc/client.conf", "a") as file1:
+        file1.writelines(f"proxypath={args.proxy} \n")
 dummy_job = args.dummy_job
 
 
@@ -293,26 +298,29 @@ def produce_arc_singularity_script(containers, metadata, commands, input_files):
             for i in range(0, len(commands)):
                 commands_joined.append(" ".join(commands[i]))
             f.write(batch_macros + "\n" + "\n".join(commands_joined))
-
-        job = f"""
-Executable = {executable_path}
-
-Log        = log/mm_mul.$(Cluster).$(Process).log
-Output     = out/mm_mul.out.$(Cluster).$(Process)
-Error      = err/mm_mul.err.$(Cluster).$(Process)
-
-transfer_input_files = {",".join(input_files)}
-should_transfer_files = YES
-RequestCpus = {requested_cpus}
-RequestMemory = {requested_memory}
-
-when_to_transfer_output = ON_EXIT_OR_EVICT
-+MaxWallTimeMins = 60
-
-+WMAgent_AgentName = "whatever"
-
-Queue 1
+        print("input files are ", input_files)
+        if len(input_files) == 1:
+            if input_files[0] == "":
+                job = f"""
+&( executable = "{executable_path}" )
+( jobname = "wn" )
+( stdout = "stdout" )
+( stderr = "stderr" )
+( gmlog = "gmlog" )
 """
+        else:
+            input_string = ""
+            for file_ in input_files:
+                input_string = input_string + f'("{file_}" "") '
+            job = f"""
+&( executable = "{executable_path}" )
+( jobname = "wn" )
+( stdout = "stdout" )
+( stderr = "stderr" )
+( gmlog = "gmlog" )
+( inputFiles = {input_string} )
+"""
+
         print(job)
         with open(sub_path, "w") as f_:
             f_.write(job)
@@ -339,23 +347,14 @@ def produce_arc_host_script(container, metadata):
         # requested_memory = int(container['resources']['requests']['memory'])/1e6
         requested_memory = container["resources"]["requests"]["memory"]
         job = f"""
-Executable = {executable_path}
-
-Log        = log/mm_mul.$(Cluster).$(Process).log
-Output     = out/mm_mul.out.$(Cluster).$(Process)
-Error      = err/mm_mul.err.$(Cluster).$(Process)
-
-should_transfer_files = YES
-RequestCpus = {requested_cpu}
-RequestMemory = {requested_memory}
-
-when_to_transfer_output = ON_EXIT_OR_EVICT
-+MaxWallTimeMins = 60
-
-+WMAgent_AgentName = "whatever"
-
-Queue 1
+&( executable = "{executable_path}" )
+( jobname = "wn" )
+( stdout = "stdout" )
+( stderr = "stderr" )
+( gmlog = "gmlog" )
 """
+        #( Memory = {requested_memory})
+        # RequestCpus = {requested_cpu}
         print(job)
         with open(sub_path, "w") as f_:
             f_.write(job)
@@ -368,12 +367,13 @@ Queue 1
 
 def arc_batch_submit(job):
     logging.info("Submitting ARC job")
+    print(f"arcsub --computing-element {args.ce} --jobdescrfile {job}")
     process = os.popen(
-        f"arcsub -C {args.ce}  {job} -spool"
+        f"arcsub --computing-element {args.ce} --jobdescrfile {job}"
     )
     preprocessed = process.read()
     process.close()
-    jid = preprocessed.split(" ")[-1].split(".")[0]
+    jid = preprocessed.split(" ")[-1]
 
     return jid
 
@@ -507,7 +507,7 @@ def SubmitHandler():
         print(sitename)
         path = produce_arc_host_script(containers[0], metadata)
 
-    out_jid = arc_batch_submit(path)
+    out_jid = arc_batch_submit(path)[:-1]
     print("Job was submitted with cluster id: ", out_jid)
     handle_jid(out_jid, pod)
 
@@ -579,17 +579,18 @@ def StatusHandler():
         resp[0]["name"] = podname
         resp[0]["namespace"] = podnamespace
         resp[0]["uid"] = poduid
+        print(f"arcstat {jid_job} --json")
         process = os.popen(f"arcstat {jid_job} --json")
         preprocessed = process.read()
         process.close()
-        job_ = json.loads(preprocessed)
-        status = job_[0]["JobStatus"]
-        if status == 1:
+        job_ = json.loads(preprocessed[10:-2])
+        status = job_["state"]
+        if status == "Accepted":
             state = {"waiting": {
             }
             }
             readiness = False
-        elif status == 2:
+        elif status == "Running" or  status == "Finishing":
             state = {"running": {
                 "startedAt": "2006-01-02T15:04:05Z",
             }
