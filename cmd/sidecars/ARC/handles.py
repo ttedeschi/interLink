@@ -384,7 +384,8 @@ def delete_pod(pod):
         f"{InterLinkConfigInst['DataRootFolder']}{pod['metadata']['name']}-{pod['metadata']['uid']}.jid"
     ) as f:
         data = f.read()
-    jid = int(data.strip())
+    #jid = int(data.strip())
+    jid = data
     process = os.popen(f"arckill {jid}")
     preprocessed = process.read()
     process.close()
@@ -538,7 +539,7 @@ def StopHandler():
     try:
         return_message = delete_pod(req)
         print(return_message)
-        if "All" in return_message:
+        if "successfully killed: 1" in return_message:
             return "Requested pod successfully deleted", 200
         else:
             return "Something went wrong when deleting the requested pod", 500
