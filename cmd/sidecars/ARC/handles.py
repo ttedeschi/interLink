@@ -22,12 +22,12 @@ args = parser.parse_args()
 
 if args.cadir != "":
     #os.environ["X509_CERT_DIR"] = args.cadir
-    with open("/home/ttedesch/.arc/client.conf", "a") as file1:
+    with open("/root/.arc/client.conf", "a") as file1:
         file1.writelines(f"cacertificatesdirectory={args.cadir} \n")
 
 if args.proxy != "":
     #os.environ["X509_USER_PROXY"] = args.proxy
-    with open("/home/ttedesch/.arc/client.conf", "a") as file1:
+    with open("/root/.arc/client.conf", "a") as file1:
         file1.writelines(f"proxypath={args.proxy} \n")
 dummy_job = args.dummy_job
 
