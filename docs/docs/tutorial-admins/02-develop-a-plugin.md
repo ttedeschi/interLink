@@ -33,9 +33,11 @@ Look for the latest release on [the release page](https://github.com/interTwin-e
 Then you are ready to install the python SDK with: 
 
 ```bash
-export VERSION=0.1.2
+#export VERSION=X.X.X
+#pip install "uvicorn[standard]" "git+https://github.com/interTwin-eu/interLink.git@${VERSION}#egg=interlink&subdirectory=examples/sidecar/templates/python"
 
-pip install "uvicorn[standard]" "git+https://github.com/interTwin-eu/interLink.git@${VERSION}#egg=interlink&subdirectory=examples/sidecar/templates/python"
+# Or download the latest one with
+pip install "uvicorn[standard]" "git+https://github.com/interTwin-eu/interLink.git@#egg=interlink&subdirectory=examples/sidecar/templates/python"
 
 ```
 

@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'interLink',
-  tagline: 'Virtual Kubelets for everyone',
+  tagline: 'Extend your cloud... everywhere!',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
