@@ -6,6 +6,8 @@ import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import HomepageVideo from '@site/src/components/HomepageVideo';
 import HomepageSchema from '@site/src/components/HomepageSchema';
 import Heading from '@theme/Heading';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import styles from './index.module.css';
 
@@ -15,19 +17,25 @@ function HomepageHeader() {
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
         <Heading as="h1" className="hero__title">
-          {siteConfig.title}
+              <ThemedImage
+        alt="Docusaurus themed image"
+        sources={{
+          light: useBaseUrl('/img/interlink_logo.png'),
+          dark: useBaseUrl('/img/interlink_logo-dark.png'),
+        }}
+      />
+          {siteConfig.tagline}
         </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
             to="/docs/intro">
-            Try it out in less than 5min! ⏱️
+            Try it out! 🚀
           </Link>
         </div>
         <br/>
-        <Heading as="h3" className="hero__subtitle">
-            And join the community channel!
+        <Heading as="h3">
+            Join the community channel!
         </Heading>
 <Link className="button button-primary" to="https://discord.gg/27qVNBZCAw">
 <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" class="bi bi-discord" viewBox="0 0 16 16">
