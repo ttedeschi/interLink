@@ -1,4 +1,4 @@
-![Interlink logo](./docs/static/imgs/interlink_logo.png)
+![Interlink logo](./docs/static/img/interlink_logo.png)
 
 ## :information_source: Overview
 
