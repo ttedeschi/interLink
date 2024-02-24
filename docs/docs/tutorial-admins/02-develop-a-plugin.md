@@ -6,7 +6,7 @@ sidebar_position: 2
 
 Learn how to develop your interLink plugin to manage containers on your remote host.
 
-We are going to follow up [the setup of an interlink node](./01-deploy-interlink.md) with the last piece of the puzzle:
+We are going to follow up [the setup of an interlink node](./01-deploy-interlink.mdx) with the last piece of the puzzle:
 
 - setup of a python SDK
 - demoing the fundamentals development of a plugin executing containers locally through the host docker daemon
@@ -310,7 +310,7 @@ for supporting configMap and secret volumes.
 
 ## Let's test is out
 
-After the completion of [the core components deployment](./01-deploy-interlink.md),
+After the completion of [the core components deployment](./01-deploy-interlink.mdx),
 you can now kickstart the newly created plugin and make it spawn on the port 4000 so it can be contacted by the interLink API server.
 
 You can submit a pod like the following to test the whole workflow:
