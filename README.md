@@ -15,4 +15,4 @@ The project got inspired by the [KNoC](https://github.com/CARV-ICS-FORTH/knoc) a
 
 For usage and development guides please refer to [our website](https://intertwin-eu.github.io/interLink/)
 
-Join us on ![Discord](https://img.shields.io/discord/1199648142803615756)
+Join us on Discord: ![Discord](https://img.shields.io/discord/1199648142803615756)
