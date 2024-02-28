@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'interLink',
-  tagline: 'Virtual Kubelets for everyone',
+  tagline: 'Extend your cloud... everywhere!',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
@@ -89,11 +89,7 @@ const config: Config = {
             {
               label: 'interTwin project Slack',
               href: 'https://join.slack.com/t/intertwin/shared_invite/zt-2cs67h9wz-2DFQ6EiSQGS1vlbbbJHctA',
-            },
-            {
-              label: 'interLink community Discord',
-              href: 'https://discord.gg/27qVNBZCAw',
-            },
+            }
           ],
         },
         {
