@@ -89,11 +89,7 @@ const config: Config = {
             {
               label: 'interTwin project Slack',
               href: 'https://join.slack.com/t/intertwin/shared_invite/zt-2cs67h9wz-2DFQ6EiSQGS1vlbbbJHctA',
-            },
-            {
-              label: 'interLink community Discord',
-              href: 'https://discord.gg/27qVNBZCAw',
-            },
+            }
           ],
         },
         {
