@@ -130,7 +130,7 @@ async def get_logs(req: interlink.LogRequest) -> bytes:
 This empty provider is already good to be started:
 
 ```bash
-uvicorn docker-plugin:app --reload --host 0.0.0.0 --log-level=debug
+uvicorn docker-plugin:app --reload --host 0.0.0.0 --port 4000 --log-level=debug
 ```
 
 At this stage, it will respond with "NOT IMPLEMENTED" errors for all the requests. 
