@@ -21,7 +21,10 @@ type SidecarHandler struct {
 	GpuManager   gpustrategies.GPUManagerInterface
 }
 
-func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, config commonIL.InterLinkConfig, Ctx context.Context) (string, error) {
+// prepareMounts iterates along the struct provided in the data parameter and checks for ConfigMaps, Secrets and EmptyDirs to be mounted.
+// For each element found, the mountData function is called.
+// It returns a string composed as the docker -v command to bind mount directories and files and the first encountered error.
+func prepareMounts(Ctx context.Context, config commonIL.InterLinkConfig, data []commonIL.RetrievedPodData, container v1.Container) (string, error) {
 	log.G(Ctx).Info("- Preparing mountpoints for " + container.Name)
 	mountedData := ""
 
@@ -36,7 +39,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 		for _, cont := range podData.Containers {
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, cfgMap, config, Ctx)
+					paths, err := mountData(Ctx, config, podData.Pod, cfgMap, container)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting ConfigMap " + cfgMap.Name)
 						return "", errors.New("Error mounting ConfigMap " + cfgMap.Name)
@@ -49,7 +52,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 
 			for _, secret := range cont.Secrets {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, secret, config, Ctx)
+					paths, err := mountData(Ctx, config, podData.Pod, secret, container)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting Secret " + secret.Name)
 						return "", errors.New("Error mounting Secret " + secret.Name)
@@ -62,7 +65,7 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 
 			for _, emptyDir := range cont.EmptyDirs {
 				if container.Name == cont.Name {
-					paths, err := mountData(container, podData.Pod, emptyDir, config, Ctx)
+					paths, err := mountData(Ctx, config, podData.Pod, emptyDir, container)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting EmptyDir " + emptyDir)
 						return "", errors.New("Error mounting EmptyDir " + emptyDir)
@@ -81,7 +84,11 @@ func prepareMounts(container v1.Container, data []commonIL.RetrievedPodData, con
 	return mountedData, nil
 }
 
-func mountData(container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig, Ctx context.Context) ([]string, error) {
+// mountData is called by prepareMounts and creates files and directory according to their definition in the pod structure.
+// The data parameter is an interface and it can be of type v1.ConfigMap, v1.Secret and string (for the empty dir).
+// Returns a string which is a bind mount of the file/directory. Example: path/to/file/on/host:path/to/file/in/container.
+// It also returns the first encountered error.
+func mountData(Ctx context.Context, config commonIL.InterLinkConfig, pod v1.Pod, data interface{}, container v1.Container) ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		log.G(Ctx).Error(err)

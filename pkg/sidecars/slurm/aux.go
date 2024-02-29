@@ -40,9 +40,10 @@ type SingularityCommand struct {
 	command       []string
 }
 
-func parsingTimeFromString(stringTime string, Ctx context.Context) (time.Time, error) {
+// parsingTimeFromString parses time from a string and returns it into a variable of type time.Time.
+// The format time can be specified in the 3rd argument.
+func parsingTimeFromString(Ctx context.Context, stringTime string, timestampFormat string) (time.Time, error) {
 	parsedTime := time.Time{}
-	timestampFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 	parts := strings.Fields(stringTime)
 	if len(parts) != 4 {
 		err := errors.New("invalid timestamp format")
@@ -59,6 +60,7 @@ func parsingTimeFromString(stringTime string, Ctx context.Context) (time.Time, e
 	return parsedTime, nil
 }
 
+// CreateDirectories is just a function to be sure directories exists at runtime
 func CreateDirectories(config commonIL.InterLinkConfig) error {
 	path := config.DataRootFolder
 	if _, err := os.Stat(path); err != nil {
@@ -72,7 +74,10 @@ func CreateDirectories(config commonIL.InterLinkConfig) error {
 	return nil
 }
 
-func LoadJIDs(config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx context.Context) error {
+// LoadJIDs loads Job IDs into the main JIDs struct from files in the root folder.
+// It's useful went down and needed to be restarded, but there were jobs running, for example.
+// Return only error in case of failure
+func LoadJIDs(Ctx context.Context, config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct) error {
 	path := config.DataRootFolder
 
 	dir, err := os.Open(path)
@@ -103,7 +108,7 @@ func LoadJIDs(config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx 
 			if err != nil {
 				log.G(Ctx).Debug(err)
 			} else {
-				StartedAt, err = parsingTimeFromString(string(StartedAtString), Ctx)
+				StartedAt, err = parsingTimeFromString(Ctx, string(StartedAtString), "2006-01-02 15:04:05.999999999 -0700 MST")
 				if err != nil {
 					log.G(Ctx).Debug(err)
 				}
@@ -113,7 +118,7 @@ func LoadJIDs(config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx 
 			if err != nil {
 				log.G(Ctx).Debug(err)
 			} else {
-				FinishedAt, err = parsingTimeFromString(string(FinishedAtString), Ctx)
+				FinishedAt, err = parsingTimeFromString(Ctx, string(FinishedAtString), "2006-01-02 15:04:05.999999999 -0700 MST")
 				if err != nil {
 					log.G(Ctx).Debug(err)
 				}
@@ -126,14 +131,16 @@ func LoadJIDs(config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx 
 	return nil
 }
 
-func prepareEnvs(container v1.Container, Ctx context.Context) []string {
+// prepareEnvs reads all Environment variables from a container and append them to a slice of strings.
+// It returns the slice containing all envs in the form of key=value.
+func prepareEnvs(Ctx context.Context, container v1.Container) []string {
 	if len(container.Env) > 0 {
 		log.G(Ctx).Info("-- Appending envs")
 		env := make([]string, 1)
 		env = append(env, "--env")
 		env_data := ""
-		for _, env_var := range container.Env {
-			tmp := (env_var.Name + "=" + env_var.Value + ",")
+		for _, envVar := range container.Env {
+			tmp := (envVar.Name + "=" + envVar.Value + ",")
 			env_data += tmp
 		}
 		if last := len(env_data) - 1; last >= 0 && env_data[last] == ',' {
@@ -150,12 +157,18 @@ func prepareEnvs(container v1.Container, Ctx context.Context) []string {
 	}
 }
 
+// prepareMounts iterates along the struct provided in the data parameter and checks for ConfigMaps, Secrets and EmptyDirs to be mounted.
+// For each element found, the mountData function is called.
+// In this context, the general case is given by host and container not sharing the file system, so data are stored within ENVS with matching names.
+// The content of these ENVS will be written to a text file by the generated SLURM script later, so the container will be able to mount these files.
+// The command to write files is appended in the global "prefix" variable.
+// It returns a string composed as the singularity --bind command to bind mount directories and files and the first encountered error.
 func prepareMounts(
-	workingPath string,
-	container v1.Container,
-	data []commonIL.RetrievedPodData,
-	config commonIL.InterLinkConfig,
 	Ctx context.Context,
+	config commonIL.InterLinkConfig,
+	data []commonIL.RetrievedPodData,
+	container v1.Container,
+	workingPath string,
 ) ([]string, error) {
 	log.G(Ctx).Info("-- Preparing mountpoints for " + container.Name)
 	mount := make([]string, 1)
@@ -174,7 +187,7 @@ func prepareMounts(
 		for _, cont := range podData.Containers {
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
-					configMapsPaths, envs, err := mountData(workingPath, container, podData.Pod, cfgMap, config, Ctx)
+					configMapsPaths, envs, err := mountData(Ctx, config, podData.Pod, container, cfgMap, workingPath)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -194,7 +207,7 @@ func prepareMounts(
 
 			for _, secret := range cont.Secrets {
 				if container.Name == cont.Name {
-					secretsPaths, envs, err := mountData(workingPath, container, podData.Pod, secret, config, Ctx)
+					secretsPaths, envs, err := mountData(Ctx, config, podData.Pod, container, secret, workingPath)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -213,7 +226,7 @@ func prepareMounts(
 
 			for _, emptyDir := range cont.EmptyDirs {
 				if container.Name == cont.Name {
-					paths, _, err := mountData(workingPath, container, podData.Pod, emptyDir, config, Ctx)
+					paths, _, err := mountData(Ctx, config, podData.Pod, container, emptyDir, workingPath)
 					if err != nil {
 						log.G(Ctx).Error(err)
 						return nil, err
@@ -226,9 +239,6 @@ func prepareMounts(
 		}
 	}
 
-	//path_hardcoded := ("/cvmfs/grid.cern.ch/etc/grid-security:/etc/grid-security" + "," +
-	//	"/cvmfs:/cvmfs" + ",")
-	//mount_data += path_hardcoded
 	if last := len(mountedData) - 1; last >= 0 && mountedData[last] == ',' {
 		mountedData = mountedData[:last]
 	}
@@ -238,14 +248,18 @@ func prepareMounts(
 	return append(mount, mountedData), nil
 }
 
+// produceSLURMScript generates a SLURM script according to data collected.
+// It must be called after ENVS and mounts are already set up since
+// it relies on "prefix" variable being populated with needed data and ENVS passed in the commands parameter.
+// It returns the path to the generated script and the first encountered error.
 func produceSLURMScript(
-	path string,
+	Ctx context.Context,
+	config commonIL.InterLinkConfig,
 	podNamespace string,
 	podUID string,
+	path string,
 	metadata metav1.ObjectMeta,
 	commands []SingularityCommand,
-	config commonIL.InterLinkConfig,
-	Ctx context.Context,
 ) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
 	err := os.MkdirAll(path, os.ModePerm)
@@ -276,22 +290,22 @@ func produceSLURMScript(
 		log.G(Ctx).Debug("--- Created file " + path + "/job.sh")
 	}
 
-	var sbatch_flags_from_argo []string
-	var sbatch_flags_as_string = ""
-	if slurm_flags, ok := metadata.Annotations["slurm-job.vk.io/flags"]; ok {
-		sbatch_flags_from_argo = strings.Split(slurm_flags, " ")
+	var sbatchFlagsFromArgo []string
+	var sbatchFlagsAsString = ""
+	if slurmFlags, ok := metadata.Annotations["slurm-job.vk.io/flags"]; ok {
+		sbatchFlagsFromArgo = strings.Split(slurmFlags, " ")
 	}
-	if mpi_flags, ok := metadata.Annotations["slurm-job.vk.io/mpi-flags"]; ok {
-		if mpi_flags != "true" {
-			mpi := append([]string{"mpiexec", "-np", "$SLURM_NTASKS"}, strings.Split(mpi_flags, " ")...)
+	if mpiFlags, ok := metadata.Annotations["slurm-job.vk.io/mpi-flags"]; ok {
+		if mpiFlags != "true" {
+			mpi := append([]string{"mpiexec", "-np", "$SLURM_NTASKS"}, strings.Split(mpiFlags, " ")...)
 			for _, singularityCommand := range commands {
 				singularityCommand.command = append(mpi, singularityCommand.command...)
 			}
 		}
 	}
 
-	for _, slurm_flag := range sbatch_flags_from_argo {
-		sbatch_flags_as_string += "\n#SBATCH " + slurm_flag
+	for _, slurmFlag := range sbatchFlagsFromArgo {
+		sbatchFlagsAsString += "\n#SBATCH " + slurmFlag
 	}
 
 	if config.Tsocks {
@@ -326,7 +340,7 @@ func produceSLURMScript(
 	sbatch_macros := "#!" + config.BashPath +
 		"\n#SBATCH --job-name=" + podUID +
 		"\n#SBATCH --output=" + path + "/job.out" +
-		sbatch_flags_as_string +
+		sbatchFlagsAsString +
 		"\n" +
 		prefix +
 		"\n"
@@ -357,12 +371,14 @@ func produceSLURMScript(
 	return f.Name(), nil
 }
 
-func SLURMBatchSubmit(path string, config commonIL.InterLinkConfig, Ctx context.Context) (string, error) {
+// SLURMBatchSubmit submits the job provided in the path argument to the SLURM queue.
+// At this point, it's up to the SLURM scheduler to manage the job.
+// Returns the output of the sbatch command and the first encoundered error.
+func SLURMBatchSubmit(Ctx context.Context, config commonIL.InterLinkConfig, path string) (string, error) {
 	log.G(Ctx).Info("- Submitting Slurm job")
-	cmd := []string{path}
 	shell := exec2.ExecTask{
-		Command: config.Sbatchpath,
-		Args:    cmd,
+		Command: "sh",
+		Args:    []string{"-c", "\"" + config.Sbatchpath + " " + path + "\""},
 		Shell:   true,
 	}
 
@@ -382,7 +398,12 @@ func SLURMBatchSubmit(path string, config commonIL.InterLinkConfig, Ctx context.
 	return string(execReturn.Stdout), nil
 }
 
-func handleJID(podUID string, output string, pod v1.Pod, path string, JIDs *map[string]*JidStruct, Ctx context.Context) error {
+// handleJID creates a JID file to store the Job ID of the submitted job.
+// The output parameter must be the output of SLURMBatchSubmit function and the path
+// is the path where to store the JID file.
+// It also adds the JID to the JIDs main structure.
+// Return the first encountered error.
+func handleJID(Ctx context.Context, pod v1.Pod, podUID string, JIDs *map[string]*JidStruct, output string, path string) error {
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
 	f, err := os.Create(path + "/JobID.jid")
@@ -402,29 +423,40 @@ func handleJID(podUID string, output string, pod v1.Pod, path string, JIDs *map[
 	return nil
 }
 
+// removeJID delete a JID from the structure
 func removeJID(podUID string, JIDs *map[string]*JidStruct) {
 	delete(*JIDs, podUID)
 }
 
-func deleteContainer(podUID string, path string, config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct, Ctx context.Context) error {
+// deleteContainer checks if a Job has not yet been deleted and, in case, calls the scancel command to abort the job execution.
+// It then removes the JID from the main JIDs structure and all the related files on the disk.
+// Returns the first encountered error.
+func deleteContainer(Ctx context.Context, config commonIL.InterLinkConfig, podUID string, JIDs *map[string]*JidStruct, path string) error {
 	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
-	_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
+	if checkIfJidExists(JIDs, podUID) {
+		_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
+		if err != nil {
+			log.G(Ctx).Error(err)
+			return err
+		} else {
+			log.G(Ctx).Info("- Deleted Job ", (*JIDs)[podUID].JID)
+		}
+	}
+	err := os.RemoveAll(path + "/" + podUID)
+	removeJID(podUID, JIDs)
 	if err != nil {
 		log.G(Ctx).Error(err)
 		return err
-	} else {
-		log.G(Ctx).Info("- Deleted Job ", (*JIDs)[podUID].JID)
 	}
-	os.RemoveAll(path + "/" + podUID)
-	removeJID(podUID, JIDs)
-	if err != nil {
-		log.G(Ctx).Warning(err)
-		return err
-	}
-	return nil
+	return err
 }
 
-func mountData(path string, container v1.Container, pod v1.Pod, data interface{}, config commonIL.InterLinkConfig, Ctx context.Context) ([]string, []string, error) {
+// mountData is called by prepareMounts and creates files and directory according to their definition in the pod structure.
+// The data parameter is an interface and it can be of type v1.ConfigMap, v1.Secret and string (for the empty dir).
+// Returns 2 slices of string, one containing the ConfigMaps/Secrets/EmptyDirs paths and one the list of relatives ENVS to be used
+// to create the files inside the container.
+// It also returns the first encountered error.
+func mountData(Ctx context.Context, config commonIL.InterLinkConfig, pod v1.Pod, container v1.Container, data interface{}, path string) ([]string, []string, error) {
 	if config.ExportPodData {
 		for _, mountSpec := range container.VolumeMounts {
 			var podVolumeSpec *v1.VolumeSource
@@ -613,4 +645,15 @@ func mountData(path string, container v1.Container, pod v1.Pod, data interface{}
 		}
 	}
 	return nil, nil, nil
+}
+
+// checkIfJidExists checks if a JID is in the main JIDs struct
+func checkIfJidExists(JIDs *map[string]*JidStruct, uid string) bool {
+	_, ok := (*JIDs)[uid]
+
+	if ok {
+		return true
+	} else {
+		return false
+	}
 }

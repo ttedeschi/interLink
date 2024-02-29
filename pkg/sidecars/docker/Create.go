@@ -14,6 +14,7 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
+// CreateHandler creates a Docker Container based on data provided by the InterLink API.
 func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(h.Ctx).Info("Docker Sidecar: received Create call")
 	var execReturn exec.ExecResult
@@ -95,7 +96,7 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 			cmd = append(cmd, additionalPortArgs...)
 
 			if h.Config.ExportPodData {
-				mounts, err := prepareMounts(container, req, h.Config, h.Ctx)
+				mounts, err := prepareMounts(h.Ctx, h.Config, req, container)
 				if err != nil {
 					HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
 					return
@@ -107,8 +108,14 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 			cmd = append(cmd, container.Command...)
 			cmd = append(cmd, container.Args...)
 
-			docker_options := ""
+			dockerOptions := ""
 
+			if dockerFlags, ok := data.Pod.ObjectMeta.Annotations["docker-options.vk.io/flags"]; ok {
+				parsedDockerOptions := strings.Split(dockerFlags, " ")
+				if parsedDockerOptions != nil {
+					for _, option := range parsedDockerOptions {
+						dockerOptions += " " + option
+					}
 			if docker_flags, ok := data.Pod.ObjectMeta.Annotations["docker-options.vk.io/flags"]; ok {
 				parsed_docker_options := strings.Split(docker_flags, " ")
 				for _, option := range parsed_docker_options {
@@ -117,7 +124,7 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			shell := exec.ExecTask{
-				Command: "docker" + docker_options,
+				Command: "docker" + dockerOptions,
 				Args:    cmd,
 				Shell:   true,
 			}
