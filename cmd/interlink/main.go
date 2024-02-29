@@ -44,9 +44,11 @@ func main() {
 	mutex.HandleFunc("/status", interLinkAPIs.StatusHandler)
 	mutex.HandleFunc("/create", interLinkAPIs.CreateHandler)
 	mutex.HandleFunc("/delete", interLinkAPIs.DeleteHandler)
-	mutex.HandleFunc("/ping", interLinkAPIs.Ping)
+	mutex.HandleFunc("/pinglink", interLinkAPIs.Ping)
 	mutex.HandleFunc("/getLogs", interLinkAPIs.GetLogsHandler)
-	err = http.ListenAndServe(":"+interLinkConfig.Interlinkport, mutex)
+	mutex.HandleFunc("/updateCache", interlink.UpdateCacheHandler)
+	err = http.ListenAndServe(":"+commonIL.InterLinkConfigInst.Interlinkport, mutex)
+
 	if err != nil {
 		log.G(interlink.Ctx).Fatal(err)
 	}

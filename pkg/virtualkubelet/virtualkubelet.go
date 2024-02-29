@@ -250,10 +250,17 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	}
 	state = runningState
 
-	err = RemoteExecution(ctx, CREATE, pod, p.interLinkConfig)
-	if err != nil {
-		return err
-	}
+	go func() {
+		err = RemoteExecution(ctx, p.interLinkConfig, p, pod, CREATE)
+		if err != nil {
+			if err.Error() == "Deleted pod before actual creation" {
+				log.G(ctx).Warn(err)
+			} else {
+				log.G(ctx).Error(err)
+			}
+			return
+		}
+	}()
 
 	// in case we have initContainers we need to stop main containers from executing for now ...
 	if len(pod.Spec.InitContainers) > 0 {
@@ -270,8 +277,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 
 		pod.Status = v1.PodStatus{
 			Phase:     v1.PodRunning,
-			HostIP:    "127.0.0.1",
-			PodIP:     "127.0.0.1",
+			HostIP:    p.internalIP,
+			PodIP:     p.internalIP,
 			StartTime: &now,
 			Conditions: []v1.PodCondition{
 				{
@@ -291,8 +298,8 @@ func (p *VirtualKubeletProvider) CreatePod(ctx context.Context, pod *v1.Pod) err
 	} else {
 		pod.Status = v1.PodStatus{
 			Phase:     v1.PodPending,
-			HostIP:    "127.0.0.1",
-			PodIP:     "127.0.0.1",
+			HostIP:    p.internalIP,
+			PodIP:     p.internalIP,
 			StartTime: &now,
 			Conditions: []v1.PodCondition{
 				{
@@ -377,14 +384,15 @@ func (p *VirtualKubeletProvider) DeletePod(ctx context.Context, pod *v1.Pod) (er
 	}
 
 	now := metav1.Now()
-	pod.Status.Phase = v1.PodSucceeded
 	pod.Status.Reason = "VKProviderPodDeleted"
 
-	err = RemoteExecution(ctx, DELETE, pod, p.interLinkConfig)
-	if err != nil {
-		log.G(ctx).Error(err)
-		return err
-	}
+	go func() {
+		err = RemoteExecution(ctx, p.interLinkConfig, p, pod, DELETE)
+		if err != nil {
+			log.G(ctx).Error(err)
+			return
+		}
+	}()
 
 	for idx := range pod.Status.ContainerStatuses {
 		pod.Status.ContainerStatuses[idx].Ready = false
@@ -555,7 +563,7 @@ func (p *VirtualKubeletProvider) statusLoop(ctx context.Context) {
 		if err != nil {
 			fmt.Print(err)
 		}
-		err = checkPodsStatus(p, ctx, string(b), p.interLinkConfig)
+		err = checkPodsStatus(ctx, p, string(b), p.interLinkConfig)
 		if err != nil {
 			log.G(ctx).Error(err)
 		}
@@ -600,7 +608,7 @@ func (p *VirtualKubeletProvider) GetLogs(ctx context.Context, namespace, podName
 		Opts:          commonIL.ContainerLogOpts(opts),
 	}
 
-	return LogRetrieval(ctx, logsRequest, p.interLinkConfig)
+	return LogRetrieval(ctx, p.interLinkConfig, logsRequest)
 }
 
 // GetStatsSummary returns dummy stats for all pods known by this provider.
