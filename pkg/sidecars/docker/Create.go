@@ -112,25 +112,19 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 			if dockerFlags, ok := data.Pod.ObjectMeta.Annotations["docker-options.vk.io/flags"]; ok {
 				parsedDockerOptions := strings.Split(dockerFlags, " ")
-				if parsedDockerOptions != nil {
-					for _, option := range parsedDockerOptions {
-						dockerOptions += " " + option
-					}
-			if docker_flags, ok := data.Pod.ObjectMeta.Annotations["docker-options.vk.io/flags"]; ok {
-				parsed_docker_options := strings.Split(docker_flags, " ")
-				for _, option := range parsed_docker_options {
-					docker_options += " " + option
+				for _, option := range parsedDockerOptions {
+					dockerOptions += " " + option
 				}
 			}
+
+			// print the docker command
+			log.G(h.Ctx).Info("Docker command: " + "docker" + dockerOptions + " " + strings.Join(cmd, " "))
 
 			shell := exec.ExecTask{
 				Command: "docker" + dockerOptions,
 				Args:    cmd,
 				Shell:   true,
 			}
-
-			// print the docker options
-			log.G(h.Ctx).Info("Docker options: " + docker_options)
 
 			execReturn, err = shell.Execute()
 			if err != nil {
