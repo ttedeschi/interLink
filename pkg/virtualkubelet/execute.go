@@ -257,7 +257,7 @@ func RemoteExecution(ctx context.Context, config commonIL.InterLinkConfig, p *Vi
 					}
 				}
 
-				pod, err = ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				_, err := ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				if err != nil {
 					return errors.New("Deleted pod before actual creation")
 				}
