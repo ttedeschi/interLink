@@ -529,7 +529,7 @@ def StopHandler():
     # READ THE REQUEST ######
     logging.info("ARC Sidecar: received Stop call")
     request_data_string = request.data.decode("utf-8")
-    req = json.loads(request_data_string)[0]
+    req = json.loads(request_data_string)
     if req is None or not isinstance(req, dict):
         print("Invalid delete request body is: ", req)
         logging.error("Invalid request data")
