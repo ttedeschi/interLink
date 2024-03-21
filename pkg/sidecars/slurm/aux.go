@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	exec2 "github.com/alexellis/go-execute/pkg/v1"
@@ -22,6 +23,7 @@ type SidecarHandler struct {
 	Config commonIL.InterLinkConfig
 	JIDs   *map[string]*JidStruct
 	Ctx    context.Context
+	Mutex  *sync.Mutex
 }
 
 var prefix string
@@ -77,7 +79,7 @@ func CreateDirectories(config commonIL.InterLinkConfig) error {
 // LoadJIDs loads Job IDs into the main JIDs struct from files in the root folder.
 // It's useful went down and needed to be restarded, but there were jobs running, for example.
 // Return only error in case of failure
-func LoadJIDs(Ctx context.Context, config commonIL.InterLinkConfig, JIDs *map[string]*JidStruct) error {
+func LoadJIDs(Ctx context.Context, config commonIL.InterLinkConfig, mutex *sync.Mutex, JIDs *map[string]*JidStruct) error {
 	path := config.DataRootFolder
 
 	dir, err := os.Open(path)
@@ -93,6 +95,7 @@ func LoadJIDs(Ctx context.Context, config commonIL.InterLinkConfig, JIDs *map[st
 		return err
 	}
 
+	mutex.Lock()
 	for _, entry := range entries {
 		if entry.IsDir() {
 			podUID := entry.Name()
@@ -127,6 +130,7 @@ func LoadJIDs(Ctx context.Context, config commonIL.InterLinkConfig, JIDs *map[st
 			(*JIDs)[podUID] = &JIDEntry
 		}
 	}
+	mutex.Unlock()
 
 	return nil
 }
@@ -262,7 +266,6 @@ func produceSLURMScript(
 	commands []SingularityCommand,
 ) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
-	prefix = ""
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {
 		log.G(Ctx).Error(err)
@@ -404,7 +407,7 @@ func SLURMBatchSubmit(Ctx context.Context, config commonIL.InterLinkConfig, path
 // is the path where to store the JID file.
 // It also adds the JID to the JIDs main structure.
 // Return the first encountered error.
-func handleJID(Ctx context.Context, pod v1.Pod, podUID string, JIDs *map[string]*JidStruct, output string, path string) error {
+func handleJID(Ctx context.Context, mutex *sync.Mutex, pod v1.Pod, podUID string, JIDs *map[string]*JidStruct, output string, path string) error {
 	r := regexp.MustCompile(`Submitted batch job (?P<jid>\d+)`)
 	jid := r.FindStringSubmatch(output)
 	f, err := os.Create(path + "/JobID.jid")
@@ -418,21 +421,24 @@ func handleJID(Ctx context.Context, pod v1.Pod, podUID string, JIDs *map[string]
 		log.G(Ctx).Error(err)
 		return err
 	}
-
+	mutex.Lock()
 	(*JIDs)[podUID] = &JidStruct{PodUID: string(pod.UID), JID: jid[1]}
+	mutex.Unlock()
 	log.G(Ctx).Info("Job ID is: " + (*JIDs)[podUID].JID)
 	return nil
 }
 
 // removeJID delete a JID from the structure
-func removeJID(podUID string, JIDs *map[string]*JidStruct) {
+func removeJID(mutex *sync.Mutex, podUID string, JIDs *map[string]*JidStruct) {
+	mutex.Lock()
 	delete(*JIDs, podUID)
+	mutex.Unlock()
 }
 
 // deleteContainer checks if a Job has not yet been deleted and, in case, calls the scancel command to abort the job execution.
 // It then removes the JID from the main JIDs structure and all the related files on the disk.
 // Returns the first encountered error.
-func deleteContainer(Ctx context.Context, config commonIL.InterLinkConfig, podUID string, JIDs *map[string]*JidStruct, path string) error {
+func deleteContainer(Ctx context.Context, config commonIL.InterLinkConfig, mutex *sync.Mutex, podUID string, JIDs *map[string]*JidStruct, path string) error {
 	log.G(Ctx).Info("- Deleting Job for pod " + podUID)
 	if checkIfJidExists(JIDs, podUID) {
 		_, err := exec.Command(config.Scancelpath, (*JIDs)[podUID].JID).Output()
@@ -444,7 +450,7 @@ func deleteContainer(Ctx context.Context, config commonIL.InterLinkConfig, podUI
 		}
 	}
 	err := os.RemoveAll(path + "/" + podUID)
-	removeJID(podUID, JIDs)
+	removeJID(mutex, podUID, JIDs)
 	if err != nil {
 		log.G(Ctx).Error(err)
 		return err
