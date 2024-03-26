@@ -1,8 +1,12 @@
 package slurm
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +42,28 @@ type JidStruct struct {
 type SingularityCommand struct {
 	containerName string
 	command       []string
+}
+
+// stringToHex encodes the provided str string into a hex string and removes all trailing redundant zeroes to keep the output more compact
+func stringToHex(str string) string {
+	var buffer bytes.Buffer
+	for _, char := range str {
+		err := binary.Write(&buffer, binary.LittleEndian, char)
+		if err != nil {
+			fmt.Println("Error converting character:", err)
+			return ""
+		}
+	}
+
+	hexString := hex.EncodeToString(buffer.Bytes())
+	hexBytes := []byte(hexString)
+	var hexReturn string
+	for i := 0; i < len(hexBytes); i += 2 {
+		if hexBytes[i] != 48 && hexBytes[i+1] != 48 {
+			hexReturn += string(hexBytes[i]) + string(hexBytes[i+1])
+		}
+	}
+	return hexReturn
 }
 
 // parsingTimeFromString parses time from a string and returns it into a variable of type time.Time.
@@ -217,6 +243,8 @@ func prepareMounts(
 							dirs := strings.Split(path, ":")
 							splitDirs := strings.Split(dirs[0], "/")
 							dir := filepath.Join(splitDirs[:len(splitDirs)-1]...)
+							splittedEnv := strings.Split(envs[i], "_")
+							log.G(Ctx).Info(splittedEnv[len(splittedEnv)-1])
 							prefix += "\nmkdir -p " + dir + " && touch " + dirs[0] + " && echo $" + envs[i] + " > " + dirs[0]
 						}
 						mountedData += path
@@ -262,7 +290,6 @@ func produceSLURMScript(
 	commands []SingularityCommand,
 ) (string, error) {
 	log.G(Ctx).Info("-- Creating file for the Slurm script")
-	prefix = ""
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {
 		log.G(Ctx).Error(err)
@@ -488,13 +515,18 @@ func mountData(Ctx context.Context, config commonIL.InterLinkConfig, pod v1.Pod,
 								for key := range mount.Data {
 									configMaps[key] = mount.Data[key]
 									fullPath := filepath.Join(podConfigMapDir, key)
+									hexString := stringToHex(fullPath)
 									fullPath += (":" + mountSpec.MountPath + "/" + key + ",")
 									configMapNamePaths = append(configMapNamePaths, fullPath)
 
 									if os.Getenv("SHARED_FS") != "true" {
-										env := string(container.Name) + "_CFG_" + key
+										env := string(container.Name) + "_CFG_" + string(hexString)
 										log.G(Ctx).Debug("---- Setting env " + env + " to mount the file later")
-										os.Setenv(env, mount.Data[key])
+										err = os.Setenv(env, mount.Data[key])
+										if err != nil {
+											log.G(Ctx).Error("Unable to set ENV for cfgmap " + key)
+											return nil, nil, err
+										}
 										envs = append(envs, env)
 									}
 								}
@@ -563,13 +595,18 @@ func mountData(Ctx context.Context, config commonIL.InterLinkConfig, pod v1.Pod,
 								for key := range mount.Data {
 									secrets[key] = mount.Data[key]
 									fullPath := filepath.Join(podSecretDir, key)
+									hexString := stringToHex(fullPath)
 									fullPath += (":" + mountSpec.MountPath + "/" + key + ",")
 									secretNamePaths = append(secretNamePaths, fullPath)
 
 									if os.Getenv("SHARED_FS") != "true" {
-										env := string(container.Name) + "_SECRET_" + key
+										env := string(container.Name) + "_SECRET_" + hexString
 										log.G(Ctx).Debug("---- Setting env " + env + " to mount the file later")
-										os.Setenv(env, string(mount.Data[key]))
+										err = os.Setenv(env, string(mount.Data[key]))
+										if err != nil {
+											log.G(Ctx).Error("Unable to set ENV for secret " + key)
+											return nil, nil, err
+										}
 										envs = append(envs, env)
 									}
 								}
