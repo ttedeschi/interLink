@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
-	log.G(Ctx).Info("Docker Sidecar: received GetLogs call")
+// GetLogsHandler reads Jobs' output file to return what's logged inside.
+// What's returned is based on the provided parameters (Tail/LimitBytes/Timestamps/etc)
+func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
+	log.G(h.Ctx).Info("Docker Sidecar: received GetLogs call")
 	var req commonIL.LogStruct
 	statusCode := http.StatusOK
 	currentTime := time.Now()
@@ -24,7 +27,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		w.Write([]byte("Some errors occurred while checking log requests raw message. Check Docker Sidecar's logs"))
-		log.G(Ctx).Error(err)
+		log.G(h.Ctx).Error(err)
 		return
 	}
 
@@ -33,22 +36,23 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		w.Write([]byte("Some errors occurred while unmarshalling log request. Check Docker Sidecar's logs"))
-		log.G(Ctx).Error(err)
+		log.G(h.Ctx).Error(err)
 		return
 	}
 
+	path := h.Config.DataRootFolder + req.Namespace + "-" + req.PodUID
 	var output []byte
 	if req.Opts.Timestamps {
-		log.G(Ctx).Error(errors.New("Not Implemented"))
+		log.G(h.Ctx).Error(errors.New("Not Implemented"))
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		return
 	} else {
-		log.G(Ctx).Info("Reading  " + commonIL.InterLinkConfigInst.DataRootFolder + req.PodUID + "/" + req.ContainerName + ".out")
-		output, err = os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + req.PodUID + "/" + req.ContainerName + ".out")
+		log.G(h.Ctx).Info("Reading  " + path + "/" + req.ContainerName + ".out")
+		output, err = os.ReadFile(path + "/" + req.ContainerName + ".out")
 		if err != nil {
-			log.G(Ctx).Info("Failed to read container logs, falling back to job log.")
-			output, err = os.ReadFile(commonIL.InterLinkConfigInst.DataRootFolder + req.PodUID + "/" + "job.out")
+			log.G(h.Ctx).Info("Failed to read container logs, falling back to job log.")
+			output, err = os.ReadFile(path + "/" + "job.out")
 			if err != nil {
 				statusCode = http.StatusInternalServerError
 				w.WriteHeader(statusCode)

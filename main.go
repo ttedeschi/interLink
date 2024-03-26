@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 
+	//certificates "k8s.io/api/certificates/v1"
+
 	"net/http"
 
 	"k8s.io/client-go/kubernetes"
@@ -43,8 +45,6 @@ import (
 
 	// "net/http"
 
-	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 	"github.com/sirupsen/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
@@ -54,6 +54,9 @@ import (
 	"github.com/virtual-kubelet/virtual-kubelet/trace/opentelemetry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
+
+	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	"github.com/intertwin-eu/interlink/pkg/virtualkubelet"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -90,7 +93,7 @@ type Opts struct {
 }
 
 // NewOpts returns an Opts struct with the default values set.
-func NewOpts(nodename string, configpath string) *Opts {
+func NewOpts(nodename string, configpath string, config commonIL.InterLinkConfig) *Opts {
 
 	if nodename == "" {
 		nodename = os.Getenv("NODENAME")
@@ -103,8 +106,8 @@ func NewOpts(nodename string, configpath string) *Opts {
 	return &Opts{
 		ConfigPath: configpath,
 		NodeName:   nodename,
-		Verbose:    commonIL.InterLinkConfigInst.VerboseLogging,
-		ErrorsOnly: commonIL.InterLinkConfigInst.ErrorsOnlyLogging,
+		Verbose:    config.VerboseLogging,
+		ErrorsOnly: config.ErrorsOnlyLogging,
 	}
 }
 
@@ -120,6 +123,8 @@ func initProvider() (func(context.Context) error, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
+
+	// TODO: disable is telemetry is disabled
 
 	// If the OpenTelemetry Collector is running on a local cluster (minikube or
 	// microk8s), it should be accessible through the NodePort service at the
@@ -161,19 +166,20 @@ func initProvider() (func(context.Context) error, error) {
 }
 
 func main() {
-	// Try from bash:
-	// INTERLINKCONFIGPATH=$PWD/kustomizations/InterLinkConfig.yaml CONFIGPATH=$PWD/kustomizations/knoc-cfg.json NODENAME=test-vk ./bin/vk
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	nodename := flag.String("nodename", "", "The name of the node")
 	configpath := flag.String("configpath", "", "Path to the VK config")
-	commonIL.NewInterLinkConfig()
-	opts := NewOpts(*nodename, *configpath)
+	interLinkConfig, err := commonIL.NewInterLinkConfig()
+	if err != nil {
+		panic(err)
+	}
+	opts := NewOpts(*nodename, *configpath, interLinkConfig)
 
 	logger := logrus.StandardLogger()
-	if commonIL.InterLinkConfigInst.VerboseLogging {
+	if interLinkConfig.VerboseLogging {
 		logger.SetLevel(logrus.DebugLevel)
-	} else if commonIL.InterLinkConfigInst.ErrorsOnlyLogging {
+	} else if interLinkConfig.ErrorsOnlyLogging {
 		logger.SetLevel(logrus.ErrorLevel)
 	} else {
 		logger.SetLevel(logrus.InfoLevel)
@@ -192,7 +198,11 @@ func main() {
 
 	log.G(ctx).Info("Tracer setup succeeded")
 
+	// TODO: disable this through options
 	trace.T = opentelemetry.Adapter{}
+
+	// TODO: if token specified http.DefaultClient = ...
+	// and remove reading from file
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
@@ -215,7 +225,9 @@ func main() {
 	var kubecfg *rest.Config
 	kubecfgFile, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
-		log.G(ctx).Error(err)
+		if os.Getenv("KUBECONFIG") != "" {
+			log.G(ctx).Error(err)
+		}
 		log.G(ctx).Info("Trying InCluster configuration")
 
 		kubecfg, err = rest.InClusterConfig()
@@ -223,6 +235,7 @@ func main() {
 			log.G(ctx).Fatal(err)
 		}
 	} else {
+		log.G(ctx).Debug("Loading Kubeconfig from " + os.Getenv("KUBECONFIG"))
 		clientCfg, err := clientcmd.NewClientConfigFromBytes(kubecfgFile)
 		if err != nil {
 			log.G(ctx).Fatal(err)
@@ -235,31 +248,34 @@ func main() {
 
 	localClient := kubernetes.NewForConfigOrDie(kubecfg)
 
-	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx)
-	// go func() {
+	nodeProvider, err := virtualkubelet.NewProvider(cfg.ConfigPath, cfg.NodeName, cfg.OperatingSystem, cfg.InternalIP, cfg.DaemonPort, ctx, interLinkConfig)
+	go func() {
 
-	// 	ILbindNow := false
-	// 	// ILbindOld := false
+		ILbind := false
+		retValue := -1
+		counter := 0
 
-	// 	for {
-	// 		err, ILbindNow = commonIL.PingInterLink(ctx)
+		for {
+			ILbind, retValue, err = commonIL.PingInterLink(ctx)
 
-	// 		if err != nil {
-	// 			log.G(ctx).Error(err)
-	// 		}
+			if err != nil {
+				log.G(ctx).Error(err)
+			}
 
-	// 		if ILbindNow == true && ILbindOld == false {
-	// 			err = commonIL.NewServiceAccount()
-	// 			if err != nil {
-	// 				log.G(ctx).Fatal(err)
-	// 			}
-	// 		}
+			if !ILbind && retValue == 1 {
+				counter++
+			} else if ILbind && retValue == 0 {
+				counter = 0
+			}
 
-	// 		ILbindOld = ILbindNow
-	// 		time.Sleep(time.Second * 10)
+			if counter > 10 {
+				log.G(ctx).Fatal("Unable to communicate with the InterLink API, exiting...")
+			}
 
-	// 	}
-	// }()
+			time.Sleep(time.Second * 10)
+
+		}
+	}()
 
 	if err != nil {
 		log.G(ctx).Fatal(err)
@@ -347,16 +363,23 @@ func main() {
 
 	api.AttachPodRoutes(podRoutes, mux, true)
 
-	parsedIP := net.ParseIP(commonIL.InterLinkConfigInst.PodIP)
+	parsedIP := net.ParseIP(interLinkConfig.PodIP)
+
+	//retriever, err := newCertificateRetriever(localClient, certificates.KubeletServingSignerName, cfg.NodeName, parsedIP)
+	//if err != nil {
+	//	log.G(ctx).Fatal("failed to initialize certificate manager: %w", err)
+	//}
+	// TODO: create a csr auto approver https://github.com/liqotech/liqo/blob/master/cmd/liqo-controller-manager/main.go#L498
 	retriever := newSelfSignedCertificateRetriever(cfg.NodeName, parsedIP)
 
 	server := &http.Server{
-		Addr:              fmt.Sprintf("0.0.0.0:%d", 10255),
+		Addr:              fmt.Sprintf("0.0.0.0:%d", 10250),
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second, // Required to limit the effects of the Slowloris attack.
 		TLSConfig: &tls.Config{
-			GetCertificate: retriever,
-			MinVersion:     tls.VersionTLS12,
+			GetCertificate:     retriever,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true,
 		},
 	}
 

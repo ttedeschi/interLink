@@ -7,53 +7,73 @@ import (
 	"net/http"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
 
-func CreateHandler(w http.ResponseWriter, r *http.Request) {
+// CreateHandler collects and rearranges all needed ConfigMaps/Secrets/EmptyDirs to ship them to the sidecar, then sends a response to the client
+func (h *InterLinkHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(Ctx).Info("InterLink: received Create call")
 
+	statusCode := -1
+
 	bodyBytes, err := io.ReadAll(r.Body)
-	statusCode := http.StatusOK
 	if err != nil {
 		statusCode = http.StatusInternalServerError
+		w.WriteHeader(statusCode)
 		log.G(Ctx).Fatal(err)
+		return
 	}
 
 	var req *http.Request              //request to forward to sidecar
 	var pod commonIL.PodCreateRequests //request for interlink
-	json.Unmarshal(bodyBytes, &pod)
+	err = json.Unmarshal(bodyBytes, &pod)
+	if err != nil {
+		statusCode = http.StatusInternalServerError
+		log.G(Ctx).Fatal(err)
+		w.WriteHeader(statusCode)
+		return
+	}
 
-	var retrieved_data []commonIL.RetrievedPodData
+	var retrievedData []commonIL.RetrievedPodData
 
 	data := commonIL.RetrievedPodData{}
-	if commonIL.InterLinkConfigInst.ExportPodData {
-		data, err = getData(pod)
+	if h.Config.ExportPodData {
+		data, err = getData(h.Config, pod)
 		if err != nil {
 			statusCode = http.StatusInternalServerError
+			log.G(Ctx).Fatal(err)
 			w.WriteHeader(statusCode)
 			return
 		}
 	}
 
-	retrieved_data = append(retrieved_data, data)
+	retrievedData = append(retrievedData, data)
 
-	if retrieved_data != nil {
-		bodyBytes, err = json.Marshal(retrieved_data)
-		log.G(Ctx).Info(string(bodyBytes))
+	if retrievedData != nil {
+		bodyBytes, err = json.Marshal(retrievedData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.G(Ctx).Fatal(err)
+			return
+		}
+		log.G(Ctx).Debug(string(bodyBytes))
 		reader := bytes.NewReader(bodyBytes)
 
-		req, err = http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/create", reader)
+		log.G(Ctx).Info(req)
+		req, err = http.NewRequest(http.MethodPost, h.Config.Sidecarurl+":"+h.Config.Sidecarport+"/create", reader)
 
 		if err != nil {
 			statusCode = http.StatusInternalServerError
 			w.WriteHeader(statusCode)
 			log.G(Ctx).Fatal(err)
+			return
 		}
 
 		log.G(Ctx).Info("InterLink: forwarding Create call to sidecar")
 		var resp *http.Response
 
+		req.Header.Set("Content-Type", "application/json")
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
 			statusCode = http.StatusInternalServerError
@@ -61,8 +81,6 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 			log.G(Ctx).Error(err)
 			return
 		}
-
-		statusCode = resp.StatusCode
 
 		if resp.StatusCode == http.StatusOK {
 			statusCode = http.StatusOK

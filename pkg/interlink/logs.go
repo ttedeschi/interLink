@@ -9,11 +9,11 @@ import (
 	"strconv"
 
 	"github.com/containerd/containerd/log"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *InterLinkHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	statusCode := http.StatusOK
 	log.G(Ctx).Info("InterLink: received GetLogs call")
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -31,16 +31,6 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.G(Ctx).Info("InterLink: get GetLogs podUID: now ", string(req2.PodUID))
-	pod, err := Clientset.CoreV1().Pods(req2.Namespace).Get(Ctx, req2.PodName, metav1.GetOptions{})
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		log.G(Ctx).Error(err)
-		return
-	}
-	req2.PodUID = string(pod.UID)
-
 	log.G(Ctx).Info("InterLink: new GetLogs podUID: now ", string(req2.PodUID))
 	if (req2.Opts.Tail != 0 && req2.Opts.LimitBytes != 0) || (req2.Opts.SinceSeconds != 0 && !req2.Opts.SinceTime.IsZero()) {
 		statusCode = http.StatusInternalServerError
@@ -50,7 +40,7 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write([]byte("Both SinceSeconds and SinceTime set. Set only one of them"))
 		}
-		log.G(Ctx).Error(errors.New("Check Opts configurations"))
+		log.G(Ctx).Error(errors.New("check opts configurations"))
 		return
 	}
 
@@ -64,11 +54,12 @@ func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reader := bytes.NewReader(bodyBytes)
-	req, err := http.NewRequest(http.MethodPost, commonIL.InterLinkConfigInst.Sidecarurl+":"+commonIL.InterLinkConfigInst.Sidecarport+"/getLogs", reader)
+	req, err := http.NewRequest(http.MethodGet, h.Config.Sidecarurl+":"+h.Config.Sidecarport+"/getLogs", reader)
 	if err != nil {
 		log.G(Ctx).Fatal(err)
 	}
 
+	req.Header.Set("Content-Type", "application/json")
 	log.G(Ctx).Info("InterLink: forwarding GetLogs call to sidecar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
