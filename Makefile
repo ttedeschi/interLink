@@ -7,7 +7,7 @@ vk:
 	CGO_ENABLED=0 OOS=linux go build -o bin/vk
 
 sidecars:
-	CGO_ENABLED=0 GOOS=linux go build -o bin/docker-sd cmd/sidecars/docker/main.go
+	CGO_ENABLED=1 GOOS=linux go build -o bin/docker-sd cmd/sidecars/docker/main.go
 	CGO_ENABLED=0 GOOS=linux go build -o bin/slurm-sd cmd/sidecars/slurm/main.go
 
 installer:

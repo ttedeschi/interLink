@@ -12,11 +12,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
+	"github.com/intertwin-eu/interlink/pkg/sidecars/docker/gpustrategies"
 )
 
 type SidecarHandler struct {
 	Config commonIL.InterLinkConfig
 	Ctx    context.Context
+	GpuManager   gpustrategies.GPUManagerInterface
 }
 
 // prepareMounts iterates along the struct provided in the data parameter and checks for ConfigMaps, Secrets and EmptyDirs to be mounted.

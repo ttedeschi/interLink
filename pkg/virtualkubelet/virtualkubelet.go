@@ -26,6 +26,7 @@ const (
 	DefaultCPUCapacity    = "100"
 	DefaultMemoryCapacity = "3000G"
 	DefaultPodCapacity    = "10000"
+	DefaultGPUCapacity    = "0"
 	DefaultListenPort     = 10250
 	NamespaceKey          = "namespace"
 	NameKey               = "name"
@@ -67,6 +68,7 @@ type VirtualKubeletConfig struct {
 	CPU    string `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
 	Pods   string `json:"pods,omitempty"`
+	GPU    string `json:"nvidia.com/gpu,omitempty"`
 }
 
 func NewProviderConfig(
@@ -87,6 +89,9 @@ func NewProviderConfig(
 	}
 	if config.Pods == "" {
 		config.Pods = DefaultPodCapacity
+	}
+	if config.GPU == "" {
+		config.GPU = DefaultGPUCapacity
 	}
 
 	lbls := map[string]string{
@@ -123,11 +128,13 @@ func NewProviderConfig(
 				"cpu":    resource.MustParse(config.CPU),
 				"memory": resource.MustParse(config.Memory),
 				"pods":   resource.MustParse(config.Pods),
+				"nvidia.com/gpu": resource.MustParse(config.GPU),
 			},
 			Allocatable: v1.ResourceList{
 				"cpu":    resource.MustParse(config.CPU),
 				"memory": resource.MustParse(config.Memory),
 				"pods":   resource.MustParse(config.Pods),
+				"nvidia.com/gpu": resource.MustParse(config.GPU),
 			},
 			Conditions: nodeConditions(),
 		},
@@ -185,6 +192,9 @@ func loadConfig(providerConfig, nodeName string, ctx context.Context) (config Vi
 		if config.Pods == "" {
 			config.Pods = DefaultPodCapacity
 		}
+		if config.GPU == "" {
+			config.GPU = DefaultGPUCapacity
+		}
 	}
 
 	if _, err = resource.ParseQuantity(config.CPU); err != nil {
@@ -195,6 +205,9 @@ func loadConfig(providerConfig, nodeName string, ctx context.Context) (config Vi
 	}
 	if _, err = resource.ParseQuantity(config.Pods); err != nil {
 		return config, fmt.Errorf("invalid pods value %v", config.Pods)
+	}
+	if _, err = resource.ParseQuantity(config.GPU); err != nil { 
+		return config, fmt.Errorf("invalid GPU value %v", config.GPU)
 	}
 	return config, nil
 }

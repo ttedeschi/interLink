@@ -27,8 +27,8 @@ func (h *SidecarHandler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req []*v1.Pod
-	err = json.Unmarshal(bodyBytes, &req)
+	var pod v1.Pod
+	err = json.Unmarshal(bodyBytes, &pod)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
@@ -37,53 +37,56 @@ func (h *SidecarHandler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, pod := range req {
-		for _, container := range pod.Spec.Containers {
-			log.G(h.Ctx).Debug("- Deleting container " + container.Name)
-			cmd := []string{"stop", container.Name}
-			shell := exec.ExecTask{
+	for _, container := range pod.Spec.Containers {
+		log.G(h.Ctx).Debug("- Deleting container " + container.Name)
+
+		// added a timeout to the stop container command
+		cmd := []string{"stop", "-t", "10", container.Name}
+		shell := exec.ExecTask{
+			Command: "docker",
+			Args:    cmd,
+			Shell:   true,
+		}
+		execReturn, _ = shell.Execute()
+
+		if execReturn.Stderr != "" {
+			if strings.Contains(execReturn.Stderr, "No such container") {
+				log.G(h.Ctx).Debug("-- Unable to find container " + container.Name + ". Probably already removed? Skipping its removal")
+			} else {
+				log.G(h.Ctx).Error("-- Error stopping container " + container.Name + ". Skipping its removal")
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
+				return
+			}
+			continue
+		}
+
+		if execReturn.Stdout != "" {
+			cmd = []string{"rm", execReturn.Stdout}
+			shell = exec.ExecTask{
 				Command: "docker",
 				Args:    cmd,
 				Shell:   true,
 			}
 			execReturn, _ = shell.Execute()
+			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 
 			if execReturn.Stderr != "" {
-				if strings.Contains(execReturn.Stderr, "No such container") {
-					log.G(h.Ctx).Debug("-- Unable to find container " + container.Name + ". Probably already removed? Skipping its removal")
-				} else {
-					log.G(h.Ctx).Error("-- Error stopping container " + container.Name + ". Skipping its removal")
-					statusCode = http.StatusInternalServerError
-					w.WriteHeader(statusCode)
-					w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
-					return
-				}
-				continue
+				log.G(h.Ctx).Error("-- Error deleting container " + container.Name)
+				statusCode = http.StatusInternalServerError
+				w.WriteHeader(statusCode)
+				w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
+				return
+			} else {
+				log.G(h.Ctx).Info("- Deleted container " + container.Name)
 			}
-
-			if execReturn.Stdout != "" {
-				cmd = []string{"rm", execReturn.Stdout}
-				shell = exec.ExecTask{
-					Command: "docker",
-					Args:    cmd,
-					Shell:   true,
-				}
-				execReturn, _ = shell.Execute()
-				execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
-
-				if execReturn.Stderr != "" {
-					log.G(h.Ctx).Error("-- Error deleting container " + container.Name)
-					statusCode = http.StatusInternalServerError
-					w.WriteHeader(statusCode)
-					w.Write([]byte("Some errors occurred while deleting container. Check Docker Sidecar's logs"))
-					return
-				} else {
-					log.G(h.Ctx).Info("- Deleted container " + container.Name)
-				}
-			}
-
-			os.RemoveAll(h.Config.DataRootFolder + pod.Namespace + "-" + string(pod.UID))
 		}
+
+		// check if the container has GPU devices attacched using the GpuManager and release them
+		h.GpuManager.Release(container.Name)
+
+		os.RemoveAll(h.Config.DataRootFolder + pod.Namespace + "-" + string(pod.UID))
 	}
 
 	w.WriteHeader(statusCode)

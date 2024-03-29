@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
@@ -20,10 +21,7 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	statusCode := http.StatusOK
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
+		HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, nil)
 		return
 	}
 
@@ -31,50 +29,96 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(bodyBytes, &req)
 
 	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
+		HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, nil)
 		return
 	}
 
 	for _, data := range req {
 		for _, container := range data.Pod.Spec.Containers {
+
+			var isGpuRequested bool = false
+			var additionalGpuArgs []string
+
+			if val, ok := container.Resources.Limits["nvidia.com/gpu"]; ok {
+
+				numGpusRequested := val.Value()
+
+				log.G(h.Ctx).Infof("Number of GPU requested: %d", numGpusRequested)
+
+				isGpuRequested = true
+
+				log.G(h.Ctx).Info("Container " + container.Name + " is requesting " + val.String() + " GPU")
+
+				numGpusRequestedInt := int(numGpusRequested)
+				_, err := h.GpuManager.GetAvailableGPUs(numGpusRequestedInt)
+
+				if err != nil {
+					HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
+					return
+				}
+
+				gpuSpecs, err := h.GpuManager.GetAndAssignAvailableGPUs(numGpusRequestedInt, container.Name)
+				if err != nil {
+					HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
+					return
+				}
+
+				var gpuUUIDs string = ""
+				for _, gpuSpec := range gpuSpecs {
+					if gpuSpec.UUID == gpuSpecs[len(gpuSpecs)-1].UUID {
+						gpuUUIDs += strconv.Itoa(gpuSpec.Index)
+					} else {
+						gpuUUIDs += strconv.Itoa(gpuSpec.Index) + ","
+					}
+				}
+
+				additionalGpuArgs = append(additionalGpuArgs, "--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES="+gpuUUIDs)
+
+			} else {
+				log.G(h.Ctx).Info("Container " + container.Name + " is not requesting a GPU")
+			}
+
 			log.G(h.Ctx).Info("- Creating container " + container.Name)
+
 			cmd := []string{"run", "-d", "--name", container.Name}
+
+			if isGpuRequested {
+				cmd = append(cmd, additionalGpuArgs...)
+			}
+
+			var additionalPortArgs []string
+			for _, port := range container.Ports {
+				if port.HostPort != 0 {
+					additionalPortArgs = append(additionalPortArgs, "-p", strconv.Itoa(int(port.HostPort))+":"+strconv.Itoa(int(port.ContainerPort)))
+				}
+			}
+
+			cmd = append(cmd, additionalPortArgs...)
 
 			if h.Config.ExportPodData {
 				mounts, err := prepareMounts(h.Ctx, h.Config, req, container)
 				if err != nil {
-					statusCode = http.StatusInternalServerError
-					log.G(h.Ctx).Error(err)
-					w.WriteHeader(statusCode)
-					w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-					os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+					HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
 					return
 				}
 				cmd = append(cmd, mounts)
 			}
 
 			cmd = append(cmd, container.Image)
-
-			for _, command := range container.Command {
-				cmd = append(cmd, command)
-			}
-			for _, args := range container.Args {
-				cmd = append(cmd, args)
-			}
+			cmd = append(cmd, container.Command...)
+			cmd = append(cmd, container.Args...)
 
 			dockerOptions := ""
 
 			if dockerFlags, ok := data.Pod.ObjectMeta.Annotations["docker-options.vk.io/flags"]; ok {
 				parsedDockerOptions := strings.Split(dockerFlags, " ")
-				if parsedDockerOptions != nil {
-					for _, option := range parsedDockerOptions {
-						dockerOptions += " " + option
-					}
+				for _, option := range parsedDockerOptions {
+					dockerOptions += " " + option
 				}
 			}
+
+			// print the docker command
+			log.G(h.Ctx).Info("Docker command: " + "docker" + dockerOptions + " " + strings.Join(cmd, " "))
 
 			shell := exec.ExecTask{
 				Command: "docker" + dockerOptions,
@@ -84,11 +128,7 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 			execReturn, err = shell.Execute()
 			if err != nil {
-				statusCode = http.StatusInternalServerError
-				log.G(h.Ctx).Error(err)
-				w.WriteHeader(statusCode)
-				w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-				os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+				HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
 				return
 			}
 
@@ -97,11 +137,8 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(execReturn.Stderr, eval) {
 					log.G(h.Ctx).Warning("Container named " + container.Name + " already exists. Skipping its creation.")
 				} else {
-					statusCode = http.StatusInternalServerError
 					log.G(h.Ctx).Error("Unable to create container " + container.Name + " : " + execReturn.Stderr)
-					w.WriteHeader(statusCode)
-					w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-					os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+					HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
 					return
 				}
 			} else {
@@ -117,11 +154,8 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 			execReturn, err = shell.Execute()
 			execReturn.Stdout = strings.ReplaceAll(execReturn.Stdout, "\n", "")
 			if execReturn.Stderr != "" {
-				statusCode = http.StatusInternalServerError
 				log.G(h.Ctx).Error("Failed to retrieve " + container.Name + " ID : " + execReturn.Stderr)
-				w.WriteHeader(statusCode)
-				w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
-				os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
+				HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
 				return
 			} else if execReturn.Stdout == "" {
 				log.G(h.Ctx).Error("Container name not found. Maybe creation failed?")
@@ -137,5 +171,16 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Some errors occurred while creating containers. Check Docker Sidecar's logs"))
 	} else {
 		w.Write([]byte("Containers created"))
+	}
+}
+
+func HandleErrorAndRemoveData(h *SidecarHandler, w http.ResponseWriter, statusCode int, s string, err error, data *commonIL.RetrievedPodData) {
+	statusCode = http.StatusInternalServerError
+	log.G(h.Ctx).Error(err)
+	w.WriteHeader(statusCode)
+	w.Write([]byte("Some errors occurred while creating container. Check Docker Sidecar's logs"))
+
+	if data != nil {
+		os.RemoveAll(h.Config.DataRootFolder + data.Pod.Namespace + "-" + string(data.Pod.UID))
 	}
 }

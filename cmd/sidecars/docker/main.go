@@ -10,6 +10,7 @@ import (
 
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	docker "github.com/intertwin-eu/interlink/pkg/sidecars/docker"
+	"github.com/intertwin-eu/interlink/pkg/sidecars/docker/gpustrategies"
 )
 
 func main() {
@@ -32,9 +33,31 @@ func main() {
 	defer cancel()
 	log.G(Ctx).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
 
+	var gpuManager gpustrategies.GPUManagerInterface
+	gpuManager = &gpustrategies.GPUManager{
+		GPUSpecsList: []gpustrategies.GPUSpecs{},
+		Ctx:          Ctx,
+	}
+
+	err = gpuManager.Init()
+	if err != nil {
+		log.G(Ctx).Fatal(err)
+	}
+
+	err = gpuManager.Discover()
+	if err != nil {
+		log.G(Ctx).Fatal(err)
+	}
+
+	err = gpuManager.Check()
+	if err != nil {
+		log.G(Ctx).Fatal(err)
+	}
+
 	SidecarAPIs := docker.SidecarHandler{
-		Config: interLinkConfig,
-		Ctx:    Ctx,
+		Config:     interLinkConfig,
+		Ctx:        Ctx,
+		GpuManager: gpuManager,
 	}
 
 	mutex := http.NewServeMux()

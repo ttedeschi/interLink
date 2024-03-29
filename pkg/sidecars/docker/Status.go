@@ -71,6 +71,8 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 				} else if containerstatus[0] == "Exited" {
 					log.G(h.Ctx).Info("-- Container " + container.Name + " has been stopped")
 					resp[i].Containers = append(resp[i].Containers, v1.ContainerStatus{Name: container.Name, State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, Ready: false})
+					// release all the GPUs from the container
+					h.GpuManager.Release(container.Name)
 				}
 			} else {
 				log.G(h.Ctx).Info("-- Container " + container.Name + " doesn't exist")
