@@ -226,7 +226,7 @@ func main() {
 	kubecfgFile, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		if os.Getenv("KUBECONFIG") != "" {
-			log.G(ctx).Error(err)
+			log.G(ctx).Debug(err)
 		}
 		log.G(ctx).Info("Trying InCluster configuration")
 

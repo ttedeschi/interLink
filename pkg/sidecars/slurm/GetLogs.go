@@ -49,16 +49,25 @@ func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	} else {
 		log.G(h.Ctx).Info("Reading  " + path + "/" + req.ContainerName + ".out")
-		output, err = os.ReadFile(path + "/" + req.ContainerName + ".out")
-		if err != nil {
-			log.G(h.Ctx).Info("Failed to read container logs, falling back to job log.")
-			output, err = os.ReadFile(path + "/" + "job.out")
-			if err != nil {
-				statusCode = http.StatusInternalServerError
-				w.WriteHeader(statusCode)
-				return
-			}
+		containerOutput, err1 := os.ReadFile(path + "/" + req.ContainerName + ".out")
+		if err1 != nil {
+			log.G(h.Ctx).Error("Failed to read container logs.")
 		}
+		jobOutput, err2 := os.ReadFile(path + "/" + "job.out")
+		if err2 != nil {
+			log.G(h.Ctx).Error("Failed to read job logs.")
+		}
+
+		if err1 != nil && err2 != nil {
+			log.G(h.Ctx).Error("Failed to retrieve logs.")
+			statusCode = http.StatusInternalServerError
+			w.WriteHeader(statusCode)
+			return
+		}
+
+		output = append(output, jobOutput...)
+		output = append(output, containerOutput...)
+
 	}
 
 	var returnedLogs string
