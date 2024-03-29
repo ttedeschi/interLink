@@ -64,7 +64,7 @@ func (h *SidecarHandler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 				singularityOptions = singOpts
 			}
 
-			commstr1 := []string{"singularity", "exec", "--containall", "--nv", singularityMounts, singularityOptions}
+			commstr1 := []string{"singularity", "exec", "--bind " + filesPath + ":$HOME", "--nv", singularityMounts, singularityOptions}
 
 			envs := prepareEnvs(h.Ctx, container)
 			image := ""
