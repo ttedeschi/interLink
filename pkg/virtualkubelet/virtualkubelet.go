@@ -117,7 +117,7 @@ func PodPhase(p Provider, phase string) (v1.PodStatus, error) {
 			},
 			{
 				Type:   v1.ContainersReady,
-				Status: ready,
+				Status: v1.ConditionTrue,
 			},
 		},
 	}, nil
