@@ -189,6 +189,10 @@ func PodPhase(_ Provider, phase string, podIP string) (v1.PodStatus, error) {
 				Type:   v1.PodScheduled,
 				Status: scheduled,
 			},
+			{
+				Type:   v1.ContainersReady,
+				Status: v1.ConditionTrue,
+			},
 		},
 	}, nil
 }
